@@ -2,16 +2,15 @@
 
 import sys, os    
 import logging
+import time
+import monitorvm, monitorip
 
 def main(logger):   
     """ A demo daemon main routine, write a datestamp to   
         /tmp/daemon-log every 10 seconds.  
     """  
-    import time
-    import monitorvm, monitorip
 
     #monitorip.updateipdb(logger)
-
     monitorvm.getinstances(logger)
 
 def initlog(logfile):

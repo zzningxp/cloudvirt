@@ -5,14 +5,16 @@ import logging, threading
 import time
 import monitorvm, monitorip
 
+workpath = '/root/cloudvirt/'
 timeinterval = 15
 xtime = 2
 
 def main(logger):   
     c = 0
     while 1:
-        getins = threading.Thread(target=monitorvm.getinstances, args=(logger,))
-        getins.start()
+        #getins = threading.Thread(target=monitorvm.getinstances, args=(logger,))
+        #getins.start()
+        monitorvm.getinstances(logger)
         if c == 0:
             upip = threading.Thread(target=monitorip.updateipdb, args=(logger,))
             upip.start()
@@ -40,7 +42,7 @@ if __name__ == "__main__":
         print >>sys.stderr, "fork #1 failed: %d (%s)" % (e.errno, e.strerror)    
         sys.exit(1)   
     # decouple from parent environment   
-    os.chdir("/")    
+    os.chdir(workpath)    
     os.setsid()    
     os.umask(0)    
     # do second fork   

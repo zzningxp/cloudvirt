@@ -1,13 +1,14 @@
 #!/usr/bin/env python
 import logging, time, threading
 
-import libvirt, sys, os, re, shelve, time
+import libvirt, sys, os, re, libshelve, time
 from xml.dom import minidom
 
 workpath = '/root/cloudvirt/'
 state = ['NoState','Running','Blocked','Paused ','Shutdwn','Shutoff','Crashed']
 ipdb = 'db4ip.dat'
 vmdb = 'db4vm.dat'
+pmdb = 'db4pm.dat'
 
 def sformat(t):
     t = re.split("\:", t)
@@ -38,11 +39,11 @@ def getcreatetime(pid, domname):
 def getdomains(pid, macip, logger):
     try:
         conn = libvirt.open("xen+ssh://root@%s/" % pid)
-    except:
-        logger.info("Lost Contection : %s" % pid)
+    except Exception, e:
+        logger.info("Lost Contection : " + pid + " " + str(e))
         return
 
-    db = shelveload(vmdb)
+    db = libshelve.load(vmdb)
     dbkey = db.keys()
 
     for id in conn.listDomainsID():
@@ -57,15 +58,26 @@ def getdomains(pid, macip, logger):
                 logger.info("Error Domain Infomation from XML Identifier: " +pid + dom.name() + str(e))
             else:
                 dbname = pid + '--' + str(dom.name())
-                dominfo['create_time'] = 'None'
+                dominfo['create_time'] = None
+                dominfo['register_time'] = None
+                dominfo['image_id'] = None
                 if dbname in dbkey:
                     dbv = db[dbname]
-                    if type(dbv['create_time']) == str:
+                    if dbv['create_time'] == None:
                         ct = getcreatetime(pid, dom.name())
                         if ct > 0:
                             dominfo['create_time'] = time.localtime(time.time() - ct)
                     else:
                         dominfo['create_time'] = dbv['create_time']
+
+                    try:
+                        dominfo['register_time'] = dbv['register_time']
+                    except:
+                        pass
+                    try:
+                        dominfo['image_id'] = dbv['image_id']
+                    except:
+                        pass
 
                 ip = macip.get(mac)
                 dominfo['pm'] = pid
@@ -78,38 +90,12 @@ def getdomains(pid, macip, logger):
                 dominfo['cputime'] = dom.info()[4] / 1000000000
                 dominfo['status'] = state[dom.info()[0]]
                 dominfo['update_time'] = time.localtime()
-                shelvemodify(vmdb, dbname, dominfo)
-
-def shelvecreate(datefile):
-    try:
-        db = shelve.open(workpath + '/' + datefile, 'c')
-    finally:
-        db.close()
-
-def shelvemodify(datefile, key, value):
-    try:
-        db = shelve.open(workpath + '/' + datefile, 'w')
-        db[key] = value
-    finally:
-        db.close()
-
-def shelveload(datefile):
-    ret = {}
-    try:
-        db = shelve.open(workpath + '/' + datefile, 'w')
-        ret.update(db)
-    finally:
-        db.close()
-    return ret
+                libshelve.modify(vmdb, dbname, dominfo)
+            
 
 def getinstances(logger):
-
-    shelvecreate(vmdb)
-    plist = open(workpath + "/nodelist").read()
-    plist = re.split(r"\n", plist)
-    plist.remove('')
-
-    macip = shelveload(ipdb)
+    plist = libshelve.getkeys(workpath + pmdb)
+    macip = libshelve.load(workpath + ipdb)
 
     thr = []
     for pid in plist:

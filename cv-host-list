@@ -1,0 +1,9 @@
+#!/usr/bin/env python
+import logging, time, threading
+import libvirt, sys, os, re, libshelve, time, getopt
+
+dbpm = 'db4pm.dat'
+db = libshelve.load(dbpm)
+
+for host in db.keys():
+    print host

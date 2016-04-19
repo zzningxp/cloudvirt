@@ -1,75 +1,104 @@
 #!/usr/bin/env python
 
-import libvirt, threading
-import os, sys, random, re
-import libshelve
+import libvirt
+import os, sys, random, re, threading, time, getopt
+import libshelve, libImage, libInstance
 
-def getdbmac():
-    db = libshelve.load('dbmac')
-    for key in db.keys():
-        if db[key] == 0 :
-            return key
+headnode = '192.168.2.1'
+imgdbf = "db4img.dat"
 
-def createinstance(pid):
-    conn = libvirt.open("xen+ssh://root@%s/" % pid)
-    if conn == None:
-        print 'Failed to open connection to the hypervisor'
-	return;
+def read_nodes(nodes_file):
+    lines = open(nodes_file).read()
+    lines = re.split(r"\n", lines)
+    lines.remove('')
+    nodes = []
+    num = []
+    for n in lines:
+        n = re.split(r"\s", n)
+        try:
+            n.remove('')
+        except:
+            pass
+        if not len(n) == 2:
+            print 'Nodes File has a Wrong Format'
+            usage()
+            sys.exit()
+        nodes.append(n[0])
+        num.append(int(n[1]))
+    return nodes, num
 
-    names = os.popen("ssh %s ls %s" % (pid, workpath)).read()
-    names = re.split(r"\n", names)
-    names.remove('')
-    print names;
+def usage():
+    print \
+"""    -i, --image=IMG\t\tImage ID
+    -n, --nodes=FILE\t\tFile Contains Nodes and Numbers to Create Instances
+    -c, --vcpus=CPUs\t\tVCPUs Number of the Virtual Machines
+    -m, --mem=MEM\t\tMemory of the Virtual Machines, in Mage Byte
 
-    cpu = 24
-    mem = 16 * 1024 * 1024
+Run cv-describe-images to see Registered Images
 
-    for name in names:
-	#if conn.lookupByName(name) != null :
-	#    continue
+Nodes File Format (on each line):
+PM(Physical Machine to Create Instances) number(Number of Intances on that PM)
+"""
 
-	#rand0 = random.randint(0,255)
-	#rand1 = random.randint(0,255)
-	#rand2 = random.randint(0,255)
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "i:n:c:m:", ["image=", "nodes=", "vcpus=", "mem="])
+except:
+    usage()
+    sys.exit()
 
-        #mac = 'd0:0d:4f:%d:%d:%d' % (rand0, rand1, rand2)
-	#mac = 'd0:0d:4f:%02x:%02x:%02x' % (rand0, rand1, rand2)
-        mac = getdbmac()
-        libshelve.modify('dbmac', mac, name)
+imageid = 0
+nodes_file = ''
+vcpus = 0
+mem = 0
+for a,o in opts:
+    if a in ('--image', '-i'):
+        imageid = o
+    if a in ('--nodes', '-n'):
+        nodes_file = o
+    if a in ('--vcpus', '-c'):
+        vcpus = int(o)
+    if a in ('--mem', '-m'):
+        mem = int(o)
+if imageid == 0 or nodes_file == '' or vcpus == 0 or mem == 0:
+    usage()
+    sys.exit()
 
-        xml = open("/root/cloudvirt/libvirt.xml").read()
-        xml = xml % ('%s' % name, 'restart', mem, cpu, '/var/run/cloudvirt/vm/%s/root' % name, mac)
-	
-	tmpfname = "/tmp/tmplibvirt%s.xml" % name
-	tmpfile = open(tmpfname, "w")
-	tmpfile.write(xml)
-	tmpfile.close()
-	os.system("scp %s %s:%s/%s/libvirt.xml" % (tmpfname, pid, workpath, name))	
+if not libshelve.iskeyexists(imgdbf, imageid):
+    print "Image Id %s doesn't existed. Run cv-describe-images to see Registered Images" % imageid
+    sys.exit()
 
-	try:
-            dom = conn.createXML(xml, 0)
-	    print "Domain %s Created" % name
-	except:
-            print "Domain %s have NOT been created!!!" % (name )
+nodes, num = read_nodes(nodes_file)
 
+imginfo = libshelve.getkey(imgdbf, imageid)
+imagename = os.path.basename(imginfo['imagefilepath'])
+checksum = imginfo['fastcheck']
+imagesize = imginfo['imagesize']
 
-nodes = open("/root/cloudvirt/nodes-create").read()
-nodes = re.split(r"\n", nodes)
-nodes.remove('')
-
-print "Create VMs on " + str(nodes) + ". \nAre you sure (y/n)?",
+print "Prepare VMs on:"
+total = len(nodes)
+for i in range(total):
+    print "%s [%s VM]\t" % (nodes[i], num[i])
+print "(Total %d nodes)" % (total)
+print "Image ID is %s, with %d Virtual CPUs and %dM Memory." % (imageid, vcpus, mem)
+print "Are You Sure (y/n)?",
 v = raw_input()
 if v != 'y' :
     sys.exit(1)
 
-workpath = "/var/run/cloudvirt/vm/"
+instance_names = libInstance.generate_instances_info(nodes, num, imageid, vcpus, mem)
+print 'Instance Info Generated.. Done.'
 
-#thr = []
-#for n in nodes :
-#    thr.append(threading.Thread(target=createinstance, args=(n, )))
-#for i in range(len(thr)):
-#    thr[i].start()
+libImage.dispatch_nv(nodes, headnode, imageid)
+image_nodes = libImage.check_nodes(nodes, headnode, imageid, imagename, checksum, imagesize)
+print 'Prepare to Dispatch Image.. Done.'
 
-for n in nodes :
-    createinstance(n)
+libImage.dispatch_image(image_nodes, headnode, imageid, imagename)
+print 'Dispatch Image to Nodes.. Done.'
+
+libImage.local_copy(nodes, num, imageid, imagename, instance_names)
+print 'Nodes Image Local Copy.. Done.'
+
+libInstance.create_instance(nodes, instance_names)
+## print error info
+print 'Instances Create.. Done.'
 

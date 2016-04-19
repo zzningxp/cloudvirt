@@ -1,0 +1,10 @@
+#!/bin/bash
+
+port=8773
+
+for i in `cat nodes-create | awk '{print $1}' `
+do 
+    pid=`ssh $i netstat -nalp | grep $port | awk '{print $7}' | awk -F '/' '{print $1}'`
+    echo $pid
+    ssh $i kill $pid
+done

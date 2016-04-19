@@ -21,11 +21,12 @@ if os.path.exists(workpath + "/vm/") == False :
         os.mkdir(workpath + "/vm/")
     except:
 	pass
-if os.path.exists(workpath + "/image/") == False :
-    try:
-        os.mkdir(workpath + "/image/")
-    except:
-	pass
+#if os.path.exists(workpath + "/image/") == False :
+#    try:
+#        os.mkdir(workpath + "/image/")
+#    except:
+#	pass
+
 instancepath = workpath + "/vm/" + instancename
 if os.path.exists(instancepath) == False:
     os.mkdir(instancepath)

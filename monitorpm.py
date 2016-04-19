@@ -1,10 +1,9 @@
 #!/usr/bin/env python
-import logging, time, threading
-
-import libvirt, sys, os, re, shelve, time
+import logging, time, threading, libvirt, sys, os, re, libshelve, time
 from xml.dom import minidom
 
 workpath = '/root/cloudvirt/'
+dbpm = 'db4pm.dat'
 
 def getnodeinfo(pid,logger):
     try:
@@ -26,24 +25,8 @@ def getnodeinfo(pid,logger):
     #nodeinfo['update_time'] = time.localtime() 
     shelvemodify(pid, nodeinfo)
 
-def shelvecreate():
-    try:
-        db = shelve.open(workpath + '/db4pm.dat', 'c')
-    finally:
-        db.close()
-
-def shelvemodify(key, value):
-    try:
-        db = shelve.open(workpath + '/db4pm.dat', 'w')
-        db[key] = value
-    finally:
-        db.close()
-
 def getpms(logger):
-    shelvecreate()
-    plist = open(workpath + "/nodelist").read()
-    plist = re.split(r"\n", plist)
-    plist.remove('')
+    plist = libshelve.getkeys(dbpm)
 
     thr = []
     for pid in plist:

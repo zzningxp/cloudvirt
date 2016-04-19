@@ -1,10 +1,13 @@
+#!/bin/bash
+
+t=1
 a0=`ls -l $1 | awk '{print $5}'`
-sleep 0.5
+sleep $t
 a1=`ls -l $1 | awk '{print $5}'`
 
 ((b=a1-a0))
 ((a1=a1/1024/1024))
-((b=b/512))
+((b=b/1024/t))
 echo $a1 MB
 echo $b KB/s
 

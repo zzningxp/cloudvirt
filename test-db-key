@@ -3,4 +3,5 @@
 import sys, libshelve, time
 
 db = sys.argv[1]
-print libshelve.load(db)
+key = sys.argv[2]
+print libshelve.getkey(db, key)

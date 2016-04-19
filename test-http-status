@@ -1,0 +1,5 @@
+#!/usr/bin/env python
+
+import libHTTPServer
+
+print libHTTPServer.server_status()

@@ -1,0 +1,22 @@
+#!/usr/bin/env python
+
+import libThreading, time, random
+
+def func():
+    r = random.random()
+    time.sleep(r)
+    print r
+    return r
+
+m = libThreading.threads()
+
+func_list = []
+for i in range(4):
+    func_list.append((func,))
+
+m.set_func_list(func_list)
+m.start()
+
+d = m.get_return()
+print d
+

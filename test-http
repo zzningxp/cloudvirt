@@ -1,0 +1,23 @@
+#!/usr/bin/env python
+
+import libHTTPServer, time, os, sys
+
+hostname = '192.168.2.1'
+port = 8773
+path = '/var/run/cloudvirt/'
+concurrent = 2
+logpath = '/root/cloudvirt/log/'
+SIGKILL = 9
+
+ret = libHTTPServer.server_start(hostname, port, path, concurrent, logpath)
+
+if not ret:
+    print 'error'
+    sys.exit()
+
+while 1:
+    try:
+        time.sleep(1)
+    except KeyboardInterrupt:
+        os.kill(os.getpid(), SIGKILL)
+

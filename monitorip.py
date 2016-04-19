@@ -1,13 +1,16 @@
 #!/usr/bin/env python
 import logging, time, threading
 
-import libvirt, sys, os, re, shelve, time
+import libvirt, sys, os, re, libshelve, time
 from xml.dom import minidom
 
 workpath = '/root/cloudvirt/'
 ipdb = 'db4ip.dat'
+dbpm = 'db4pm.dat'
+ipranges = ['192.168.2']
 ips = []
 
+"""
 def getipsthread(logger, host):
     cmd = "ssh %s \"grep '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' /var/log/messages\"" % host
     msg = os.popen(cmd).read()
@@ -18,10 +21,7 @@ def getipsthread(logger, host):
     ips = list(set(ips))
 
 def getips(logger):
-    plist = open(workpath + "/nodelist").read()
-    plist = re.split(r"\n", plist)
-    plist.remove('')
-
+    plist = libshelve.getkeys(dbpm)
     gth = []
 
     for i in plist:
@@ -32,13 +32,15 @@ def getips(logger):
         gth[i].join()
 
     return ips
+"""
 
 def getarping(logger):
     #getips(logger)
     
     ips = []
-    for i in range(254):
-        ips.append('172.16.30.%d' % i)
+    for iprange in ipranges: 
+        for i in range(254):
+            ips.append('%s.%d' % (iprange, i))
 
     pingthr = []
     for ip in ips:
@@ -60,23 +62,8 @@ def getarping(logger):
 
     return macip
 
-
-def shelvecreate(datefile):
-    try:
-        db = shelve.open(workpath + '/' + datefile, 'c')
-    finally:
-        db.close()
-
-def shelvemodify(datefile, key, value):
-    try:
-        db = shelve.open(workpath + '/' + datefile, 'w')
-        db[key] = value
-    finally:
-        db.close()
-
 def updateipdb(logger):
-    shelvecreate(ipdb)
     macip = getarping(logger)
     for k in macip.keys():
-        shelvemodify(ipdb, k, macip[k])
+        libshelve.modify(ipdb, k, macip[k])
 

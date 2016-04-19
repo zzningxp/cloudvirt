@@ -1,8 +1,10 @@
 #!/usr/bin/env python
 
-import sys, shelve, time, random, getopt
+import sys, libshelve, time, random, getopt
 
 workpath = '/root/cloudvirt/'
+db4vm = 'db4vm.dat'
+
 def s2hr(s):
     ret = ''
     if s/3600 > 0:
@@ -14,15 +16,6 @@ def s2hr(s):
     ret += str(s) + 's'
     return ret
 
-def shelveload():
-    ret = {}
-    try:
-        db = shelve.open(workpath + '/db4vm.dat', 'r')
-        ret.update(db)
-    finally:
-        db.close()
-    return ret
-    
 def dbsort(db, subkey):
     ret = {}
     try:
@@ -48,7 +41,7 @@ searchpmip = ''
 timeinternal = 200
 sortarg = 'pm'
 
-idb = shelveload()
+idb = libshelve.load(db4vm)
 
 try:
     opts, args = getopt.getopt(sys.argv[1:], "i:n:p:t:s:h", ["name=","pmip=","time=","sort=","help"])
@@ -69,7 +62,7 @@ for a,o in opts:
     if a in ('--sort', '-s'):
         sortarg = o
 
-print 'PM\tID\tVM\tIP\tMAC\tVCpus\tMEM\tCPU time\tStatus\tCreate time\tUpdate Time'
+print 'PM\tID\tVM\tIP\tMAC\tVCpus\tMEM\tCPU time\tStatus\tImage Id\t Create time\tUpdate Time'
 
 db = dbsort(idb, sortarg)
 pms = db.keys()
@@ -79,13 +72,15 @@ pmcnt = 0
 for key in pms:
     dom = db[key]
     updatetime = int(nowtime - time.mktime(dom['update_time']))
-    if type(dom['create_time']) == str:
-        createtime = "None"
-    else:
+    createtime = None
+    if not dom['create_time'] == None:
         createtime = time.strftime("%y-%m-%d %H:%M", dom['create_time'])
+
     if updatetime < timeinternal and searchname in dom['name'] and searchpmip in dom['pm']:
         pmcnt += 1
-        print '%s :%d\t%s\t%s\t%s\t%d %dM\t%ss\t%s\t%s\t^%ss ago' % (dom['pm'], dom['id_on_pm'], dom['name'], dom['ip'], dom['mac'], dom['vcpu'], dom['mem'], dom['cputime'], dom['status'], createtime, updatetime)
+        print '%s :%s\t' % (dom['pm'], dom['id_on_pm']),
+        print '%s\t%s\t%s\t%d %dM\t%ss\t' % (dom['name'], dom['ip'], dom['mac'], dom['vcpu'], dom['mem'], dom['cputime']),
+        print '%s\t%s\t%s\t^%ss ago' % (dom['status'], dom['image_id'], createtime, updatetime)
 
 print "Total %s VMs" % pmcnt
 

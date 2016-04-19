@@ -1,0 +1,12 @@
+#!/usr/bin/env python
+
+import libHTTPServer, sys
+
+hostname = sys.argv[1] 
+port = int(sys.argv[2])
+path = sys.argv[3]
+concurrent = int(sys.argv[4])
+logpath = sys.argv[5]
+
+libHTTPServer.server_start(hostname, port, path, concurrent, logpath)
+
