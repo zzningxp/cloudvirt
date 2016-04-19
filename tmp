@@ -1,11 +1,34 @@
 #!/usr/bin/env python
 
-import os, sys, random, re
+#!/usr/bin/python
 
-rand0 = random.randint(0,255)
-rand1 = random.randint(0,255)
-rand2 = random.randint(0,255)
+import sys
+import shelve
+import time
 
-mac = 'd0:0d:4f:%02x:%02x:%02x' % (rand0, rand1, rand2)
+def CreateData():
+    try:
+        db = shelve.open('db.dat', 'c')
+    finally:
+        db.close()
 
-print mac
+def LoadData():
+    try:
+        db = shelve.open('db.dat', 'r')
+        for item in db.items():
+            print item
+    finally:
+        db.close()
+
+def ModifyData(key, value):
+    try:
+        db = shelve.open('db.dat', 'w')
+        db[key] = value
+    finally:
+        db.close()
+
+if __name__ == '__main__':
+#    CreateData()
+#    ModifyData('new', sys.argv[1])
+    LoadData()
+

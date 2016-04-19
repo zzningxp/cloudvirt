@@ -3,7 +3,7 @@
 import libvirt
 import os, sys, random, re
 
-nodes = open("/root/cloudvirt/nodes-create").read()
+nodes = open("/root/cloudvirt/create-nodes").read()
 nodes = re.split(r"\n", nodes)
 nodes.remove('')
 
@@ -32,7 +32,7 @@ for n in nodes :
 	mac = 'd0:0d:4f:%02x:%02x:%02x' % (rand0, rand1, rand2)
 
         xml = open("/root/cloudvirt/libvirt.xml").read()
-        xml = xml % ('vm%s' % name, 'restart', 30000000, 16, '/var/run/cloudvirt/vm/%s/root' % name, mac)
+        xml = xml % ('vm%s' % name, 'restart', 20000000, 16, '/var/run/cloudvirt/vm/%s/root' % name, mac)
 	
 	tmpfname = "/tmp/tmplibvirt%s.xml" % name
 	tmpfile = open(tmpfname, "w")
@@ -42,5 +42,6 @@ for n in nodes :
 
 	try:
             dom = conn.createXML(xml, 0)
-	except:
 	    print "Domain %s create" % name
+	except:
+            print "Domain %s have not been created." % (name )
