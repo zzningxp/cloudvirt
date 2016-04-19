@@ -1,0 +1,21 @@
+#!/usr/bin/env python
+
+import libvirt
+import sys
+
+conn = libvirt.open("xen+ssh://root@192.168.2.8/")
+if conn == None:
+    print 'Failed to open connection to the hypervisor'
+    sys.exit(1)
+
+names = ['i-13','i-14','i-15','i-16']
+ac = 1
+for name in names:
+    ac += 1
+    mac = 'd0:0d:3f:01:11:0%d' % ac
+    
+    xml = open("/root/cloudvirt/libvirt.xml").read()
+    xml = xml % ('vm%s' % name, 'restart', 800000, 2, '/var/run/cloudvirt/vm/%s/root' % name, '/var/run/cloudvirt/vm/%s/swap' % name, mac)
+
+    dom = conn.createXML(xml, 0)
+

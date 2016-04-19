@@ -1,0 +1,8 @@
+#!/bin/bash
+
+for i in `seq 1 254`
+do 
+ping -c 1 192.168.2.$i >/dev/null 2> /dev/null &
+done
+
+sleep 10s
