@@ -1,0 +1,23 @@
+#!/usr/bin/env python
+
+import libvirt
+import os, sys, random, re
+
+nodes = open("/root/cloudvirt/nodes-create").read()
+nodes = re.split(r"\n", nodes)
+nodes.remove('')
+
+workpath = "/var/run/cloudvirt/vm/"
+
+for n in nodes : 
+    os.system("scp nv-prepare-instance %s:" % n)
+
+    names = os.popen("ssh %s ls %s" % (n, workpath)).read()
+    names = re.split(r"\n", names)
+    names.remove('')
+    for instancename in names :
+    #for i in range(4) :
+    #    instancename = "i-" + n.split(".")[3] + "-" + str(random.randint(10000, 99999))
+    #    print instancename
+        os.system("ssh %s ./nv-prepare-instance windows.render.2008server3dm_new1.img %s &" % (n, instancename))
+

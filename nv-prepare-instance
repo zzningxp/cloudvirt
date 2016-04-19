@@ -1,0 +1,34 @@
+#!/usr/bin/env python
+
+import libvirt
+import os, sys, random, shutil
+
+workpath = "/var/run/cloudvirt/"
+imagefetchpath = "/root/"
+if len(sys.argv) < 3:
+    print 'Usage: %s image_file_name instance_name' % sys.argv[0]
+    sys.exit(1)
+imagefetchfile = sys.argv[1]
+instancename = sys.argv[2]
+
+if os.path.exists(workpath) == False :
+    try:
+	os.mkdir(workpath)
+    except:
+	pass
+if os.path.exists(workpath + "/vm/") == False :
+    try:
+        os.mkdir(workpath + "/vm/")
+    except:
+	pass
+if os.path.exists(workpath + "/image/") == False :
+    try:
+        os.mkdir(workpath + "/image/")
+    except:
+	pass
+instancepath = workpath + "/vm/" + instancename
+if os.path.exists(instancepath) == False:
+    os.mkdir(instancepath)
+
+os.system("cp " + imagefetchpath + imagefetchfile + " " + instancepath + "/root")
+

@@ -1,0 +1,11 @@
+#!/usr/bin/env python
+
+import os, sys, random, re
+
+rand0 = random.randint(0,255)
+rand1 = random.randint(0,255)
+rand2 = random.randint(0,255)
+
+mac = 'd0:0d:4f:%02x:%02x:%02x' % (rand0, rand1, rand2)
+
+print mac

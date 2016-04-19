@@ -1,21 +1,46 @@
 #!/usr/bin/env python
 
 import libvirt
-import sys
+import os, sys, random, re
 
-conn = libvirt.open("xen+ssh://root@192.168.2.8/")
-if conn == None:
-    print 'Failed to open connection to the hypervisor'
-    sys.exit(1)
+nodes = open("/root/cloudvirt/nodes-create").read()
+nodes = re.split(r"\n", nodes)
+nodes.remove('')
 
-names = ['i-13','i-14','i-15','i-16']
-ac = 1
-for name in names:
-    ac += 1
-    mac = 'd0:0d:3f:01:11:0%d' % ac
-    
-    xml = open("/root/cloudvirt/libvirt.xml").read()
-    xml = xml % ('vm%s' % name, 'restart', 800000, 2, '/var/run/cloudvirt/vm/%s/root' % name, '/var/run/cloudvirt/vm/%s/swap' % name, mac)
+workpath = "/var/run/cloudvirt/vm/"
 
-    dom = conn.createXML(xml, 0)
+for n in nodes :
+    conn = libvirt.open("xen+ssh://root@%s/" % n)
+    if conn == None:
+        print 'Failed to open connection to the hypervisor'
+	continue;
 
+    names = os.popen("ssh %s ls %s" % (n, workpath)).read()
+    names = re.split(r"\n", names)
+    names.remove('')
+    print names;
+
+    for name in names:
+	#if conn.lookupByName(name) != null :
+	#    continue
+
+	rand0 = random.randint(0,255)
+	rand1 = random.randint(0,255)
+	rand2 = random.randint(0,255)
+
+        #mac = 'd0:0d:4f:%d:%d:%d' % (rand0, rand1, rand2)
+	mac = 'd0:0d:4f:%02x:%02x:%02x' % (rand0, rand1, rand2)
+
+        xml = open("/root/cloudvirt/libvirt.xml").read()
+        xml = xml % ('vm%s' % name, 'restart', 30000000, 16, '/var/run/cloudvirt/vm/%s/root' % name, mac)
+	
+	tmpfname = "/tmp/tmplibvirt%s.xml" % name
+	tmpfile = open(tmpfname, "w")
+	tmpfile.write(xml)
+	tmpfile.close()
+	os.system("scp %s %s:%s/%s/libvirt.xml" % (tmpfname, n, workpath, name))	
+
+	try:
+            dom = conn.createXML(xml, 0)
+	except:
+	    print "Domain %s create" % name
