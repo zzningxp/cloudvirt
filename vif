@@ -1,0 +1,13 @@
+r0=`ifconfig eth0 | grep 'RX bytes' | awk '{print $2}' | awk -F: '{print $2}'`
+t0=`ifconfig eth0 | grep 'RX bytes' | awk '{print $6}' | awk -F: '{print $2}'`
+sleep 0.5
+r1=`ifconfig eth0 | grep 'RX bytes' | awk '{print $2}' | awk -F: '{print $2}'`
+t1=`ifconfig eth0 | grep 'RX bytes' | awk '{print $6}' | awk -F: '{print $2}'`
+
+hn=`hostname`
+((r=r1-r0))
+((t=t1-t0))
+((r=r/512))
+((t=t/512))
+echo $hn:  RX Rate: $r KB/s  TX Rate: $t KB/s
+

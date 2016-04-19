@@ -1,0 +1,22 @@
+#!/usr/bin/env python
+
+import libvirt
+import os, sys, random, re
+import libshelve
+
+def getdbmac():
+    db = libshelve.load('dbmac')
+    for key in db.keys():
+        if db[key] == 0 :
+            return key
+
+name = "test"
+
+#mac = getdbmac()
+#libshelve.modify('dbmac', mac, name
+db = libshelve.load('dbmac')
+i = 1
+for key in db.keys():
+    print "R%03d\t%s" % (i, key)
+    i += 1
+

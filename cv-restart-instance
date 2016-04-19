@@ -1,0 +1,77 @@
+#!/usr/bin/env python
+
+import libvirt, shelve
+import os, sys, random, re, threading
+
+cvworkpath = '/root/cloudvirt/'
+nvworkpath = "/var/run/cloudvirt/vm/"
+cnt = 0
+
+def shelveload():
+    ret = {}
+    try:
+        db = shelve.open(cvworkpath + '/db4vm.dat', 'r')
+        ret.update(db)
+    finally:
+        db.close()
+    return ret
+
+def getnodes():
+    db = shelveload()
+    pms = []
+    for key in db.keys():
+        pms.append(db[key]['pm'])
+    return list(set(pms))
+
+def cntinc():
+    global cnt
+    cnt += 1
+
+def restartnodes(pid):
+    conn = libvirt.open("xen+ssh://root@%s/" % pid)
+    if conn == None:
+        print 'Failed to open connection to the hypervisor'
+	return;
+
+    livedom = []
+    for id in conn.listDomainsID():
+        if id > 0:
+            dom = conn.lookupByID(id)
+            livedom.append(dom.name())
+
+    names = os.popen("ssh %s ls %s 2>/dev/null" % (pid, nvworkpath)).read()
+    names = re.split(r"\n", names)
+    names.remove('')
+
+    for name in names:
+        if name in livedom:
+            continue
+
+	tmpfname = "/tmp/tmplibvirt%s.xml" % name
+	ret = os.system("scp %s:%s/%s/libvirt.xml %s 2>/dev/null" % (pid, nvworkpath, name, tmpfname))	
+        if ret !=0:
+            print "Can't found xml file"
+            continue;
+        xml = open(tmpfname).read()
+
+	try:
+            dom = conn.createXML(xml, 0)
+            cntinc()
+	    print "Domain %s create" % name
+	except Exception, e:
+            print "Domain %s on %s have not been created. %s" % (name, pid, e )
+
+nodes = getnodes()
+print nodes
+
+thr = []
+for n in nodes:
+    thr.append(threading.Thread(target=restartnodes, args=(n,)))
+
+for i in range(len(nodes)):
+    thr[i].start()
+for i in range(len(nodes)):
+    thr[i].join()
+
+print "%d VM have been restarted" % (cnt)
+

@@ -30,5 +30,5 @@ instancepath = workpath + "/vm/" + instancename
 if os.path.exists(instancepath) == False:
     os.mkdir(instancepath)
 
-os.system("cp " + imagefetchpath + imagefetchfile + " " + instancepath + "/root")
+os.system("mv " + imagefetchpath + imagefetchfile + " " + instancepath + "/root")
 

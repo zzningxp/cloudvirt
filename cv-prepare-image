@@ -8,16 +8,22 @@ nodes = re.split(r"\n", nodes)
 nodes.remove('')
 
 workpath = "/var/run/cloudvirt/vm/"
+imagename = "root.img"
+
+print "Prepare VMs on " + str(nodes) + " and Image file is " + imagename + ". \nAre you sure (y/n)?",
+v = raw_input()
+if v != 'y' :
+    sys.exit(1)
 
 for n in nodes : 
     os.system("scp nv-prepare-instance %s:" % n)
 
-    names = os.popen("ssh %s ls %s" % (n, workpath)).read()
-    names = re.split(r"\n", names)
-    names.remove('')
-    for instancename in names :
-    #for i in range(4) :
-    #    instancename = "i-" + n.split(".")[3] + "-" + str(random.randint(10000, 99999))
-    #    print instancename
-        os.system("ssh %s ./nv-prepare-instance windows.render.2008server3dm_new1.img %s &" % (n, instancename))
+    #names = os.popen("ssh %s ls %s" % (n, workpath)).read()
+    #names = re.split(r"\n", names)
+    #names.remove('')
+    #for instancename in names :
+    for i in range(1) :
+        instancename = "cvi-" + n.split(".")[3] + "-" + str(random.randint(10000, 99999))
+        print instancename
+        os.system("ssh %s ./nv-prepare-instance %s %s &" % (n, imagename, instancename))
 

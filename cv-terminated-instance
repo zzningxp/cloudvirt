@@ -1,26 +1,63 @@
 #!/usr/bin/env python
 
-import libvirt
+import libvirt, shelve, threading, getopt
 import os, sys, random, re
 
-nodes = open("/root/cloudvirt/nodes-create").read()
-nodes = re.split(r"\n", nodes)
-nodes.remove('')
+workpath = '/root/cloudvirt/'
+def shelveload():
+    ret = {}
+    try:
+        db = shelve.open(workpath + '/db4vm.dat', 'r')
+        ret.update(db)
+    finally:
+        db.close()
+    return ret
 
-print "Terminate all VMs on " + str(nodes) + ". Are you sure ?"
-v = raw_input()
-if v != 'y' :
-   sys.exit(1)
+def getallnodes():
+    db = shelveload()
+    pms = []
+    for key in db.keys():
+        pms.append(db[key]['pm'])
+    return list(set(pms))
 
-for n in nodes :
-    conn = libvirt.open("xen+ssh://root@%s/" % n)
+def terminatePMInstancs(pid):
+    conn = libvirt.open("xen+ssh://root@%s/" % pid)
     if conn == None:
         print 'Failed to open connection to the hypervisor'
-	continue;
+        return
     
     for id in conn.listDomainsID():
         if id > 0:
 	    dom = conn.lookupByID(id)
 	    name = dom.name()
 	    dom.destroy()
-	    print "%s Terminated" % name
+	    print "%s has been terminated, please wait it to shutdown" % name
+
+def terminateAllInstances(nodes):
+    print "Terminate all VMs on " + str(nodes) + ". \nAre you sure ?",
+    v = raw_input()
+    if v != 'y' :
+        sys.exit(1)
+
+    thr = []
+    for n in nodes:
+        thr.append(threading.Thread(target=terminatePMInstancs, args=(n,)))
+
+    for i in range(len(nodes)):
+        thr[i].start()
+    for i in range(len(nodes)):
+        thr[i].join()
+
+def usage():
+    print "usage"
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "i:", ["all"])
+except:
+    usage()
+    sys.exit()
+
+if ('--all','') in opts:
+    nodes = getallnodes()
+    terminateAllInstances(nodes)
+

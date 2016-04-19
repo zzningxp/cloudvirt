@@ -1,0 +1,27 @@
+#!/usr/bin/env python
+
+import sys, os    
+import logging
+
+def main(logger):   
+    """ A demo daemon main routine, write a datestamp to   
+        /tmp/daemon-log every 10 seconds.  
+    """  
+    import time
+    import monitorvm, monitorip
+
+    #monitorip.updateipdb(logger)
+
+    monitorvm.getinstances(logger)
+
+def initlog(logfile):
+    logger = logging.getLogger()
+    hdlr = logging.FileHandler(logfile)
+    formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
+    hdlr.setFormatter(formatter)
+    logger.addHandler(hdlr)
+    logger.setLevel(logging.NOTSET)
+    return logger
+
+if __name__ == "__main__":   
+    main(initlog("/root/cloudvirt/deamon.log"))

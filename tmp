@@ -1,34 +1,10 @@
-#!/usr/bin/env python
-
-#!/usr/bin/python
-
-import sys
-import shelve
-import time
-
-def CreateData():
-    try:
-        db = shelve.open('db.dat', 'c')
-    finally:
-        db.close()
-
-def LoadData():
-    try:
-        db = shelve.open('db.dat', 'r')
-        for item in db.items():
-            print item
-    finally:
-        db.close()
-
-def ModifyData(key, value):
-    try:
-        db = shelve.open('db.dat', 'w')
-        db[key] = value
-    finally:
-        db.close()
-
-if __name__ == '__main__':
-#    CreateData()
-#    ModifyData('new', sys.argv[1])
-    LoadData()
-
+172.16.1.10	172.16.30.57
+172.16.1.11	172.16.30.58
+172.16.1.12	172.16.30.59
+172.16.1.13	172.16.30.60
+172.16.1.14	172.16.30.61
+172.16.1.16	172.16.30.62
+172.16.1.17	172.16.30.63
+172.16.1.19	172.16.30.65
+172.16.1.20	172.16.30.66
+172.16.1.21	172.16.30.67

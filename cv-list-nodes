@@ -1,6 +1,6 @@
 #!/usr/bin/env python
 
-import sys, shelve, time
+import sys, shelve, time, random, getopt
 
 workpath = '/root/cloudvirt/'
 def s2hr(s):
@@ -15,9 +15,9 @@ def s2hr(s):
     return ret
 
 def shelveload():
+    ret = {}
     try:
-        ret = {}
-        db = shelve.open(workpath + '/db.dat', 'r')
+        db = shelve.open(workpath + '/db4vm.dat', 'r')
         ret.update(db)
     finally:
         db.close()
@@ -25,30 +25,67 @@ def shelveload():
     
 def dbsort(db, subkey):
     ret = {}
-    asc = 0
     try:
         for key in db.keys():
-            ret[db[key][subkey] + str(asc)] = db[key]
-            asc += 1
+            ret[str(db[key][subkey]) + str(random.random())] = db[key]
         return ret
-    except:
+    except Exception, e:
         return db
 
+def usage(db, timeinternal, sortarg):
+    print "List Virtual Machines in Nodes configured in File : [ nodelist ]"
+    print "  -n, --name=NAME\tSearch for all VM name contains NAME"
+    print "  -p, --pmip=IP  \tSearch for all PM IP contains IP"
+    print "  -t, --time=TIME\tLimit the update time with in TIME (Default %d)" % timeinternal
+    print "  -s, --sort=COL \tSort list by COL (Default %s)" % sortarg
+    db = db[db.keys()[0]]
+    print "  \t\t\tSort COL: ",
+    for key in db.keys():
+        print key + " |",
+
+searchname = ''
+searchpmip = ''
+timeinternal = 200
+sortarg = 'pm'
 
 idb = shelveload()
-print 'PM\tID\tVM\tIP\tVCpus\tMEM\tStatus\tUpdate Time'
-if len(sys.argv) == 1 :
-    argv = 'pm'
-else:
-    argv = sys.argv[1]
-db = dbsort(idb, argv)
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "i:n:p:t:s:h", ["name=","pmip=","time=","sort=","help"])
+except:
+    usage(idb, timeinternal, sortarg)
+    sys.exit()
+
+for a,o in opts:
+    if a in ('--help', '-h'):
+        usage(idb, timeinternal, sortarg)
+        sys.exit()
+    if a in ('--name', '-n'):
+        searchname = o
+    if a in ('--pmip', '-p'):
+        searchpmip = o
+    if a in ('--time', '-t'):
+        timeinternal = int(o)
+    if a in ('--sort', '-s'):
+        sortarg = o
+
+print 'PM\tID\tVM\tIP\tMAC\tVCpus\tMEM\tCPU time\tStatus\tCreate time\tUpdate Time'
+
+db = dbsort(idb, sortarg)
 pms = db.keys()
 pms.sort()
+nowtime = time.time()
+pmcnt = 0
 for key in pms:
     dom = db[key]
-    updatetime = time.strftime("%Y-%m-%d %H:%M:%S", dom['update_time'])
-    print '%s\t:%d\t%s\t%s\t%d\t%dM\t%s\t%s\t%s' % (dom['pm'], dom['id_on_pm'], dom['name'], dom['ip'], dom['vcpu'], dom['mem'], dom['status'], s2hr(dom['cputime']), updatetime)
+    updatetime = int(nowtime - time.mktime(dom['update_time']))
+    if type(dom['create_time']) == str:
+        createtime = "None"
+    else:
+        createtime = time.strftime("%y-%m-%d %H:%M", dom['create_time'])
+    if updatetime < timeinternal and searchname in dom['name'] and searchpmip in dom['pm']:
+        pmcnt += 1
+        print '%s :%d\t%s\t%s\t%s\t%d %dM\t%ss\t%s\t%s\t^%ss ago' % (dom['pm'], dom['id_on_pm'], dom['name'], dom['ip'], dom['mac'], dom['vcpu'], dom['mem'], dom['cputime'], dom['status'], createtime, updatetime)
 
-print "Total %s VMs" % len(pms)
-
+print "Total %s VMs" % pmcnt
 
