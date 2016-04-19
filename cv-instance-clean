@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 
 ## Cleaning Instances Files after Instances have been terminated
 ## Running Virtual Instances could NOT be terminated!

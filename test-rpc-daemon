@@ -1,0 +1,6 @@
+import os, time
+
+s = time.time()
+os.system("ssh %s '%s/nv-rpc-daemon &' &" % ('192.168.2.2', '/usr/share/cloudvirt'))
+print time.time() - s
+

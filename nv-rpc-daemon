@@ -1,0 +1,54 @@
+#!/usr/bin/python
+
+import SimpleXMLRPCServer, sys, os, time, commands, threading
+
+workpath = '/usr/share/cloudvirt/'
+rpcport = 8772
+
+class rpcmethod:
+    def command(self, cmd):
+        ret, debugout = commands.getstatusoutput(cmd)
+        return ret, debugout
+
+def server_thread():
+    host = '0.0.0.0'
+    obj = rpcmethod()
+    server = SimpleXMLRPCServer.SimpleXMLRPCServer((host, rpcport))
+    server.register_instance(obj)
+    #print "Listening on %s port %d" % (host, rpcport)
+    server.serve_forever()
+ 
+def main(snowballtree):
+    thr = []
+    for i in range(snowballtree):
+        thr.append(threading.Thread(target=server_thread))
+    for i in range(snowballtree):
+        thr[i].start()
+
+if __name__ == "__main__":
+        # do the UNIX double-fork magic, see Stevens' "Advanced    
+        # Programming in the UNIX Environment" for details (ISBN 0201563177)
+    try:
+        pid = os.fork()    
+        if pid > 0:
+            # exit first parent   
+            sys.exit(0)
+    except OSError, e:
+        print >>sys.stderr, "fork #1 failed: %d (%s)" % (e.errno, e.strerror)    
+        sys.exit(1)
+    # decouple from parent envirtonment
+    os.chdir(workpath)
+    os.setsid()
+    os.umask(0)
+    # do second fork
+    try:
+        pid = os.fork()
+        if pid > 0 :
+            # exit from second parent, print eventual PID before
+            print "Daemon PID %d" % pid
+            sys.exit(0)
+    except OSError, e:
+        print >>sys.stderr, "fork #2 failed: %d (%s)" % (e.errno, e.strerror)
+        sys.exit(1)
+    #start the daemon main loop
+    main(int(sys.argv[1]))

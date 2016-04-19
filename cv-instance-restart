@@ -1,15 +1,12 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 
-import libInstance, libshelve, os, sys, random, re, libThreading
-
-installpath = '/root/cloudvirt/'
-dbvm = installpath + 'db4vm.dat'
+import libInstance, libMysqlInstance, os, sys
 
 args = sys.argv[1:]
-vms = libshelve.load(dbvm)
-for cvi in args:
-    vm = libshelve.getkey(dbvm, cvi)
-    if vm == None:
-        print '%s is not a register instance' % cvi
-        continue
-    libInstance.restart_instance(vm['pm'], cvi)
+instc = libMysqlInstance.Instances()
+for name in args:
+    host = instc.get_hostname_byname(name)
+    if host:
+        libInstance.restart_instance(host, name)
+    else:
+        print '%s is not a register instance' % name

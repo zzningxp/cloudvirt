@@ -1,9 +1,47 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 import logging, time, threading
-import libvirt, sys, os, re, libshelve, time, getopt
+import libvirt, sys, os, re, time, getopt
+import libMysqlHost, libMysqlCluster
 
-dbpm = 'db4pm.dat'
-db = libshelve.load(dbpm)
+def usage():
+    print "  -c, --cluster=NAME\tSearch for all Host in Cluster NAME"
+    cc = libMysqlCluster.Cluster()
+    col = [cc.col_id, cc.col_clustername]
+    ccs = cc.select(' , '.join(col), None, None)
+    for c in ccs:
+        for i in c:
+            print i,
+        print
 
-for host in db.keys():
-    print host
+where = []
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "c:", ["cluster="])
+except:
+    usage()
+    sys.exit()
+
+hs = libMysqlHost.Hosts()
+for a, o in opts:
+    if a in ('--help', '-h'):
+        usage()
+        sys.exit()
+    if a in ('--cluster', '-c'):
+        where.append("%s = '%s'" % (hs.col_clustername, o))
+
+where = ' and '.join(where)
+
+columns = [hs.col_hostid, hs.col_clustername, hs.col_ip, hs.col_disksize, hs.col_memory, hs.col_cpus, hs.col_update_time]
+
+collen = [0 for x in range(len(columns))]
+hosts = hs.select(' , '.join(columns), where, None)
+hostcount = len(hosts)
+hosts.insert(0, columns)
+for host in hosts:
+    #print time.instance[-1]
+    for i, val in enumerate(host):
+        collen[i] = max(collen[i], len(str(val)))
+for host in hosts:
+    for i,val in enumerate(host):
+        print str(val).ljust(collen[i] + 1), 
+    print
+print 'Total %d Hosts' % hostcount

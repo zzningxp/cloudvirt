@@ -2,3 +2,6 @@
 
 a=`netstat -nalp | grep 8773 | awk '{print $7}' | awk -F / '{print$1}'`
 kill $a 2>/dev/null
+
+a=`netstat -nalp | grep 8772 | awk '{print $7}' | awk -F / '{print$1}'`
+kill $a 2>/dev/null

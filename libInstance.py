@@ -1,22 +1,18 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 
 import libvirt, threading
 import os, sys, random, re, md5, time
-import libshelve, libThreading
+import libThreading, libMysqlInstance, libMysqlHost, libXMLdom, libMysqlImages
 
 workpath = "/var/run/cloudvirt/vm/"
-db4vm = "/root/cloudvirt/db4vm.dat"
 
-def get_host_hashname(pid):
-    hash = md5.new(pid)
-    return hash.hexdigest()[:8]
-    
 def generate_instances_info(nodes, nums, imageid, vcpus, mem):
     dom_list = []
-    for i, pid in enumerate(nodes):
-        ## dom0 name load from db
-        dom0_hash_name = get_host_hashname(pid)
+    instc = libMysqlInstance.Instances()
+    hs = libMysqlHost.Hosts()
 
+    for i, pid in enumerate(nodes):
+        dom0_hash_name = hs.get_hashname(pid)
         list = []
         for j in range(nums[i]):
             domU_rand_name = str(random.randint(100000, 999999))
@@ -26,47 +22,51 @@ def generate_instances_info(nodes, nums, imageid, vcpus, mem):
             list.append(instancename)
             domU_rand_mac = 'd0:0d:%02x:%02x:%02x:%02x' % (random.randint(0,255), random.randint(0,255), random.randint(0,255), random.randint(0,255))
             domU_rand_mac = domU_rand_mac.upper()
+            username = None
 
-            dominfo = {}
-            dominfo['pm'] = pid
-            dominfo['id_on_pm'] = None
-            dominfo['name'] = instancename
-            dominfo['ip'] = None
-            dominfo['mac'] = domU_rand_mac
-            dominfo['mem'] = mem
-            dominfo['vcpu'] = vcpus
-            dominfo['cputime'] = 0 
-            dominfo['status'] = 'Pending'
-            dominfo['update_time'] = time.localtime()
-            dominfo['create_time'] = None
-            dominfo['register_time'] = time.localtime()
-            dominfo['image_id'] = imageid
-            libshelve.modify('db4vm.dat', instancename, dominfo)
-
+            tuplelist = []
+            tuplelist.append((instc.col_name, instancename))
+            tuplelist.append((instc.col_hostname, pid))
+            tuplelist.append((instc.col_username, username))
+            tuplelist.append((instc.col_imagename, imageid))
+            tuplelist.append((instc.col_mac, domU_rand_mac))
+            tuplelist.append((instc.col_status, 'Pending'))
+            tuplelist.append((instc.col_update_time, time.localtime()))
+            tuplelist.append((instc.col_register_time, time.localtime()))
+            tuplelist.append((instc.col_cputime, 0))
+            tuplelist.append((instc.col_vcpu, vcpus))
+            tuplelist.append((instc.col_mem, mem))
+            instc.insert(tuplelist)
         dom_list.append(list)
-
     return dom_list
 
 def create_instance_threading(pid, dom_list):
     conn = libvirt.open("xen+ssh://root@%s/" % pid)
     if conn == None:
+        ### clean domains in the list in DB
         print 'Failed to open connection to the hypervisor'
 	return 0;
 
-    for dom in dom_list:
-        dominfo = libshelve.getkey(db4vm, dom)
-        if dominfo == None:
+    instc = libMysqlInstance.Instances()
+    img = libMysqlImages.Images()
+    for name in dom_list:
+        dominfo = instc.select_dictlist(" %s = '%s' " % (instc.col_name, name))
+        if len(dominfo) == 0:
             print 'Domain info can\'t be loaded from datebase'
             return 255
 
-        name = dominfo['name']
-        mem = dominfo['mem'] * 1000
-        vcpu = dominfo['vcpu']
+        dominfo = dominfo[0]
+        mem = dominfo[instc.col_mem] * 1000
+        vcpu = dominfo[instc.col_vcpu]
+        mac = dominfo[instc.col_mac]
+        imginfo = img.select_dictlist(" %s = '%s'" % (img.col_imageid, dominfo[instc.col_imagename]))
+        if len(imginfo) > 0:
+            imgtype = imginfo[0][img.col_imageformat]
+        else:
+            imgtype = 'raw'
 
-        xml = open("/root/cloudvirt/libvirt.xml").read()
-        xml = xml % (name, 'restart', mem, vcpu, '%s/%s/root' % (workpath, name), dominfo['mac'])
+        xml = libXMLdom.getDomainXML(name, mem, vcpu, '%s/%s/root' % (workpath, name), imgtype, mac)
         ## some PM with different hardware: like ethernet. Need to detect the hardwares
-        ## I think it should be modified this part
 	
 	tmpfname = "/tmp/tmplibvirt%s.xml" % name
 	tmpfile = open(tmpfname, "w")
@@ -77,8 +77,9 @@ def create_instance_threading(pid, dom_list):
 	try:
             dom = conn.createXML(xml, 0)
 	    print "Domain [%s] %s Created" % (pid, name)
-	except:
-            libshelve.delkey(db4vm, dbkey)
+	except Exception, e:
+            print e
+            ## instc.delete(name)
             ## clear_disk() # delete image file or mv back to the image cache
             print "Domain [%s] %s create Failed!!!" % (pid, name)
 
@@ -91,6 +92,23 @@ def create_instance(nodes, instance_name):
     ts.start()
 
 def restart_instance(pid, name):
+    conn = libvirt.open("xen+ssh://root@%s/" % pid)
+    if conn == None:
+        print 'Failed to open connection to the hypervisor'
+        return;
+
+    try:
+        dom = conn.lookupByName(name)
+    except:
+        print 'Instance %s is not running' % (name,)
+    else:
+        try:
+            dom.reboot(0)
+        except Exception, e:
+            print e
+            print 'Reboot %s failed'
+
+def resume_instance(pid, name):
     conn = libvirt.open("xen+ssh://root@%s/" % pid)
     if conn == None:
         print 'Failed to open connection to the hypervisor'
@@ -114,9 +132,9 @@ def restart_instance(pid, name):
         if isimg == 0:
             try:
                 dom = conn.createXML(xml, 0)
-                print "Domain %s restart on %s" % (name, pid)
+                print "Domain %s resume on %s" % (name, pid)
             except Exception, e:
-                print "Domain %s on %s have not been restart. %s" % (name, pid, e )
+                print "Domain %s on %s have not been resume. %s" % (name, pid, e )
         else:
             print 'Instance Image File Missing or Modified'
     else:

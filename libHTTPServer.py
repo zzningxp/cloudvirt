@@ -3,6 +3,7 @@ import os, time, BaseHTTPServer, SimpleHTTPServer, sys, threading
 SIGKILL = 9 # Linux System Signal
 cnt = 0
 status = True
+logpath = '/var/log/cloudvirt'
 
 def server_daemon(httpd, logpath):
     try:
@@ -11,6 +12,8 @@ def server_daemon(httpd, logpath):
         pass
     sys.stdout = open(logpath + 'http_access.log', 'w')
     sys.stderr = open(logpath + 'http_errors.log', 'w')
+    #sys.stdout = open('/dev/null', 'w')
+    #sys.stderr = open('/dev/null', 'w')
     while status:
         httpd.handle_request()
     

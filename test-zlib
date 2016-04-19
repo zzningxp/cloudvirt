@@ -1,0 +1,32 @@
+#!/usr/bin/python
+
+import zlib, urllib
+
+fp = urllib.urlopen('http://localhost/default.html')    # ........
+data = fp.read()
+data = data * 5 
+fp.close()
+
+com = zlib.compressobj(zlib.Z_BEST_COMPRESSION)
+decom = zlib.decompressobj()
+chunk_size = 30;
+
+str_chunks = [data[i * chunk_size:(i + 1) * chunk_size] \
+    for i in range((len(data) + chunk_size) / chunk_size)]
+print len(str_chunks)
+
+strx = ''
+for chunk in str_chunks:
+    strx += com.compress(chunk)
+strx += com.flush()
+print '......', len(strx)
+
+chunk_size += 2
+str_chunks = [strx[i * chunk_size:(i + 1) * chunk_size] \
+    for i in range((len(strx) + chunk_size) / chunk_size)]
+strx = ''
+for chunk in str_chunks:
+    strx += decom.decompress(chunk)
+strx += decom.flush()
+print len(strx)
+print strx == data

@@ -1,10 +1,12 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 import logging, time, threading
-import libvirt, sys, os, re, libshelve, time, getopt
+import libvirt, sys, os, re, time, getopt
+import libMysqlHost
 
-dbpm = 'db4pm.dat'
 args = sys.argv[1:]
 
+hs = libMysqlHost.Hosts()
 for host in args:
-    if libshelve.iskeyexists(dbpm, host):
-        libshelve.delkey(dbpm, host) 
+    ret = hs.delete([(hs.col_hostid, host)])
+    if ret == 0:
+        print 'Host %s has been deregistered. Done.' % host

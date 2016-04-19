@@ -1,0 +1,25 @@
+#!/usr/bin/python
+
+import os, sys
+import libImage
+installpath = libImage.installpath
+dlport = libImage.dlport
+imagepath = libImage.imagepath
+concurrent = libImage.concurrent
+snowballtrees = libImage.snowballtrees
+logpath = libImage.logpath
+
+def dispatch_nv_thread(n):
+    os.system('ssh %s mkdir -p %s' % (n, installpath))
+    os.system("scp nv-* %s:%s 1>/dev/null" % (n, installpath))
+    os.system("scp libFileCheck.py %s:%s 1>/dev/null" % (n, installpath))
+    os.system("scp libGZip.py %s:%s 1>/dev/null" % (n, installpath))
+    os.system("scp libHTTPServer.py %s:%s 1>/dev/null" % (n, installpath))
+    os.system("ssh %s mkdir -p %s" % (n, imagepath))
+    os.system("ssh %s %s/nv-kill-httpd" % (n, installpath))
+    os.system("ssh %s 'nohup %s/nv-prepare-image %s %s %s %s %s' &" % (n, installpath, n, dlport, imagepath, concurrent * snowballtrees, logpath))
+    #sshpid = os.popen("ps -ef | grep 'ssh %s %s/nv-prepare-image' | grep -v grep" % (n, installpath)).read().split()[1]
+    #os.system("kill %s" % sshpid)
+    ## this should be running at background, should not taking the ssh channel
+
+dispatch_nv_thread(sys.argv[1]) 

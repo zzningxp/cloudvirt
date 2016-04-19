@@ -1,46 +1,21 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 
 import libvirt
 import os, sys, random, re, threading, time, getopt
-import libshelve, libImage, libInstance, libDispatch
+import libImage, libInstance, libMysqlImages 
 
 imgdbf = "db4img.dat"
-
-def read_nodes(nodes_file):
-    f = open(nodes_file)
-    nodes = []
-    num = []
-    cluster_list = []
-    for n in f.readlines():
-        n = n.rstrip("\r\n")
-        if len(n) == 0:
-            cluster_list.append(len(nodes))
-            continue
-        n = re.split(r"\s", n)
-        try:
-            n.remove('')
-        except:
-            pass
-        if not len(n) == 2:
-            print 'Nodes File has a Wrong Format'
-            usage()
-            sys.exit()
-        nodes.append(n[0])
-        num.append(int(n[1]))
-
-    cluster_list.append(len(nodes))
-    return nodes, num, cluster_list
 
 def usage():
     print """\
 Usage: cv-create-instance -i IMG -h HEADNODE -n FILE -c CPUs -m MEM [-y] [--same-location] [--only-dispatch]
 
     -i, --image=IMG\t\tImage ID
+    -h, --headnode=HEAD\t\tHeadnode who has the image
     -n, --nodes=FILE\t\tFile Contains Nodes and Numbers to Create Instances
     -c, --vcpus=CPUs\t\tVCPUs Number of the Virtual Machines
     -m, --mem=MEM\t\tMemory of the Virtual Machines, in Mage Byte
     -y\t\t\tAnswer all question yes
-    -h, --headnode=HEAD\t\tHeadnode who has the image
     --same-location\t\tHeadnode is inside of the nodes cluster
     --only-dispatch\t\tOnly Dispatch Images, NOT to create instance
 
@@ -64,7 +39,6 @@ mem = 0
 is_samelocation = False
 only_dispatch = False
 headnode = ''
-concurrence = 3
 allyes = False
 for a,o in opts:
     if a in ('--image', '-i'):
@@ -87,55 +61,59 @@ if imageid == 0 or nodes_file == '' or vcpus == 0 or mem == 0 or headnode == '':
     usage()
     sys.exit()
 
-if not libshelve.iskeyexists(imgdbf, imageid):
+img = libMysqlImages.Images()
+nodes, num, cluster_list = libImage.read_nodes(nodes_file)
+imginfo = img.select_dict_withtuples([(img.col_imageid, imageid)])
+if len(imginfo) == 0:
     print "Image Id %s doesn't existed. Run cv-describe-images to see Registered Images" % imageid
     sys.exit()
+## check the image file existing
+imginfo = imginfo[0]
+imagename = os.path.basename(imginfo[img.col_filepath])
+chunkcount = imginfo[img.col_chunk_count]
 
-nodes, num, cluster_list = read_nodes(nodes_file)
+imgblock = libMysqlImages.ImageBlocks()
+checksum = imgblock.get_checksum(imageid)
+chunksizes = imgblock.get_block_size(imageid)
 
-imginfo = libshelve.getkey(imgdbf, imageid)
-imagename = os.path.basename(imginfo['imagefilepath'])
-checksum = imginfo['fastcheck']
-imagesize = imginfo['imagesize']
-
-cluster_nodes = libDispatch.get_clusters(nodes, cluster_list, nodes)
-print "Prepare VMs on:"
-i = 0
-for ci, cn in enumerate(cluster_nodes):
-    print 'Cluster %d' % ci
-    for n in cn:
-        print "%s [%s VM]\t" % (n, num[i])
-        i += 1
-print "(Total %d nodes on %d clusters)" % (i, len(cluster_nodes))
-print "Image ID is %s, with %d Virtual CPUs and %dM Memory." % (imageid, vcpus, mem)
-if only_dispatch:
-    print "Only Dispatch Image"
-print "Are You Sure (y/n)?",
-if allyes:
-    v = 'y'
-else:
+cluster_nodes = libImage.get_clusters(nodes, cluster_list, nodes)
+if not allyes:
+    print "Prepare VMs on:"
+    i = 0
+    for ci, cn in enumerate(cluster_nodes):
+        print 'Cluster %d' % ci
+        for n in cn:
+            print "%s [%s VM]\t" % (n, num[i])
+            i += 1
+    print "(Total %d nodes on %d clusters)" % (i, len(cluster_nodes))
+    print "Image ID is %s, with %d Virtual CPUs and %dM Memory." % (imageid, vcpus, mem)
+    if only_dispatch:
+        print "Only Dispatch Image"
+    print "Are You Sure (y/n)?",
     v = raw_input()
-if v != 'y' :
-    sys.exit(1)
+    if v != 'y' :
+        sys.exit(1)
 
 if not only_dispatch:
     instance_names = libInstance.generate_instances_info(nodes, num, imageid, vcpus, mem)
     print 'Instance Info Generated.. Done.'
 
 timestamp = time.time()
-libImage.dispatch_nv(nodes, headnode, imageid, concurrence)
-need_image_nodes = libImage.check_nodes(nodes, imageid, imagename, checksum, imagesize)
+libImage.dispatch_nv(nodes, headnode, imageid)
+need_image_nodes = libImage.check_nodes(nodes, imageid, imagename, checksum, chunksizes, chunkcount)
+#need_image_nodes = nodes
 print 'Prepare to Dispatch Image.. Done. Time Used: %d' % (time.time() - timestamp)
 
+print 'Dispatching Image to Nodes..' 
 timestamp = time.time()
-image_cluster_nodes = libDispatch.get_clusters(nodes, cluster_list, need_image_nodes)
-libDispatch.dispatch_image(image_cluster_nodes, headnode, imageid, imagename, imagesize, concurrence, is_samelocation)
+libImage.dispatch_image(nodes, cluster_list, need_image_nodes, headnode, imageid, imagename, chunkcount, is_samelocation)
 print 'Dispatch Image to Nodes.. Done. Time Used: %d' % (time.time() - timestamp)
-libImage.kill_httpd([headnode] + nodes)
+#libImage.kill_httpd([headnode] + nodes)
 
 if not only_dispatch:
-    libImage.local_copy(nodes, headnode, num, imageid, imagename, instance_names)
-    print 'Nodes Image Local Copy.. Done.'
+    timestamp = time.time()
+    libImage.local_decompress(nodes, headnode, num, imageid, imagename, instance_names)
+    print 'Nodes Image Local Copy.. Done. Time Used: %d' % (time.time() - timestamp)
 
     libInstance.create_instance(nodes, instance_names)
     ## print error info

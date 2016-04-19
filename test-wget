@@ -1,0 +1,14 @@
+#!/usr/bin/python
+
+import time, sys, os, shutil, libWGet
+urls = sys.argv[2:]
+ll = int(sys.argv[1])
+
+for i in range(ll):
+    ts2 = time.time()
+    libWGet.get(urls, ['%d.zzz' % i])
+    ts2 = time.time() - ts2
+    sz = os.path.getsize('%d.zzz' % i)
+    print '    Serial Time: %d, %d' % (ts2, sz / ts2)
+    os.remove('%d.zzz' % i)
+

@@ -1,35 +1,49 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 
-import md5
-blocksize = 1024 * 1024
-checksize = blocksize * 63
+import md5, random 
 
-def full_filechecker(filepath):
-    try: 
-        f = open(filepath, "rb") 
-        str = f.read(blocksize) 
-        m = md5.new()
-        while(len(str) != 0): 
-            m.update(str) 
-            str = f.read(blocksize) 
-        f.close() 
-    except: 
-        print 'get file crc error!' 
-        return 0 
-    return m.hexdigest()
+class checksum(object):
 
-def fast_filechecker(filepath, offset):
-    try: 
-        f = open(filepath, "rb")
-        f.seek(blocksize * offset, 1)
-        str = f.read(blocksize) 
-        m = md5.new()
-        while(len(str) != 0):
-            m.update(str)
-            str = f.read(blocksize)
-            f.seek(checksize, 1)
-        f.close()
-    except: 
-        print 'get file crc error!' 
-        return 0 
-    return m.hexdigest()
+    stripcount = 64
+    blocksize = 1024 * 64 #64K a block
+    checksize = blocksize * (stripcount - 1)
+
+    filepath = ''
+    spliter = ','
+    
+    def __init__(self, filepath):
+        self.filepath = filepath
+
+    def get_full_checksum(self):
+        list = []
+        for i in range(self.stripcount):
+            list.append(self.fast_filechecker(i))
+        return self.spliter.join(list)
+    
+    def random_check(self, strsum, count):
+        sumlist = strsum.split(self.spliter)
+        s = self.fast_filechecker(0)
+        if s != sumlist[0]:
+            return False
+        for i in range(count - 1):
+            offset = random.randint(1, self.stripcount - 1)
+            s = self.fast_filechecker(offset)
+            if s != sumlist[offset]:
+                return False
+        return True
+
+    def fast_filechecker(self, offset):
+        try: 
+            f = open(self.filepath, "rb")
+            f.seek(self.blocksize * offset, 1)
+            str = f.read(self.blocksize) 
+            m = md5.new()
+            while(len(str) != 0):
+                m.update(str)
+                str = f.read(self.blocksize)
+                f.seek(self.checksize, 1)
+            f.close()
+        except:
+            ### raise a exception
+            print 'get file crc error!' 
+        return m.hexdigest()

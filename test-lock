@@ -1,0 +1,23 @@
+#!/usr/bin/python
+
+from threading import *  
+import time
+
+def t1(semaphore):  
+#    print '%s acquire semaphore...' % currentThread().getName()
+    if semaphore.acquire():
+        print '%s get semaphore' % currentThread().getName()
+        time.sleep(4)
+        print '%s release semaphore' % currentThread().getName()
+        semaphore.release()
+
+thr = [Semaphore(2), Semaphore(2), Semaphore(2)]
+Thread(target=t1, args=(thr[0],)).start()  
+Thread(target=t1, args=(thr[0],)).start()  
+Thread(target=t1, args=(thr[0],)).start()  
+Thread(target=t1, args=(thr[1],)).start()  
+Thread(target=t1, args=(thr[0],)).start()  
+Thread(target=t1, args=(thr[1],)).start()  
+Thread(target=t1, args=(thr[1],)).start()  
+Thread(target=t1, args=(thr[2],)).start()  
+

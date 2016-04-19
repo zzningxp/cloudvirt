@@ -1,43 +1,36 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 import logging, time, threading
 
-import libvirt, sys, os, re, libshelve, time
-from xml.dom import minidom
+import libvirt, sys, os, re, time
+import libMysqlMacIP, libMysqlHost, libThreading
 
-workpath = '/root/cloudvirt/'
-ipdb = 'db4ip.dat'
-dbpm = 'db4pm.dat'
-ipranges = ['172.16.30', '172.16.31']
-## should get ipranges from outside of the source code
-ips = []
+workpath = "/root/cloudvirt/"
 
-"""
-def getipsthread(logger, host):
-    cmd = "ssh %s \"grep '[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}\.[0-9]\{1,3\}' /var/log/messages\"" % host
-    msg = os.popen(cmd).read()
-    ip = re.findall('\d+\.\d+\.\d+\.\d+', msg)
-    ip = list(set(ip))
-    global ips
-    ips.extend(ip)
-    ips = list(set(ips))
-
-def getips(logger):
-    plist = libshelve.getkeys(dbpm)
-    gth = []
-
-    for i in plist:
-        gth.append(threading.Thread(target=getipsthread, args=(logger, i)))
+def getdhcp(logger):
+    plist = []
+    filename = "%sdhcp-list.dat" % workpath
+    f = open(filename, 'r')
+    plist = f.readlines()
     for i in range(len(plist)):
-        gth[i].start()
-    for i in range(len(plist)):
-        gth[i].join()
+        plist[i] = plist[i][0:plist[i].find('\n')]
+    f.close()
 
-    return ips
-"""
+    macip = {}
+    for pid in plist:
+        tmpfile = os.popen("ssh %s cat /var/lib/dhcpd/dhcpd.leases" % pid)
+        tmpstr = tmpfile.read()
+        strlist = re.split('lease',tmpstr)
+        for str in strlist:
+            ip = re.search('[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}',str)
+            if ip is not None:
+                mac = re.search('..:..:..:..:..:..',str)
+                if mac is not None:
+                    macip[mac.group()] = ip.group()
+    return macip
 
 def getarping(logger):
     #getips(logger)
-    
+    ipranges = ['10.0.1'] 
     ips = []
     for iprange in ipranges: 
         for i in range(254):
@@ -64,7 +57,14 @@ def getarping(logger):
     return macip
 
 def updateipdb(logger):
-    macip = getarping(logger)
-    for k in macip.keys():
-        libshelve.modify(ipdb, k, macip[k])
+    #dhcpinfo = getdhcp(logger)
+    dhcpinfo = getarping(logger)
+    macip = libMysqlMacIP.MacIPs()
+    for mac in dhcpinfo.keys():
+        ip = macip.getip(mac)
+        if ip:
+            if ip != dhcpinfo[mac]:
+                macip.update_tuples([(macip.col_mac, mac)],[(macip.col_ip, dhcpinfo[mac])])
+        else:
+            macip.insert([(macip.col_mac, mac),(macip.col_ip, dhcpinfo[mac])])
 

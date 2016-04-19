@@ -1,0 +1,12 @@
+#!/usr/bin/python
+
+import libInstance, libMysqlInstance, os, sys
+
+args = sys.argv[1:]
+instc = libMysqlInstance.Instances()
+for name in args:
+    host = instc.get_hostname_byname(name)
+    if host:
+        libInstance.resume_instance(host, name)
+    else:
+        print '%s is not a register instance' % name

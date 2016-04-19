@@ -1,16 +1,15 @@
-#!/usr/bin/env python
+#!/usr/bin/python
 
-import sys, libshelve, time
+import sys, time, libMysqlImages
 
-dbf = 'db4img.dat'
-images = libshelve.load(dbf)
+img = libMysqlImages.Images()
+images = img.select_dictlist(None)
 
-print "Image ID\tUser\tOS type\tSize\tRegister Time"
+cols = [img.col_imageid, img.col_userid, img.col_imageformat, img.col_virtual_size, img.col_chunk_count, img.col_registertime]
+for key in cols:
+    print key, '\t',
+print
 for image in images:
-    info = images[image]
-    uname = info['username']
-    path = info['imagefilepath']
-    ostype = info['imageostype']
-    size = info['imagesize'] / 1024 / 1024
-    regtime = time.strftime("%Y-%m-%d %H:%M:%S", info['registertime'])
-    print "%s\t%s\t%s\t%sM\t%s" % (image, uname, ostype, size, regtime)
+    for key in cols:
+        print image[key], '\t',
+    print

@@ -1,15 +1,27 @@
-#!/usr/bin/env python
-import logging, time, threading
-import libvirt, sys, os, re, libshelve, time, getopt
+#!/usr/bin/python
+import sys, libHost, getopt
 
-dbpm = 'db4pm.dat'
-args = sys.argv[1:]
+def usage():
+    print """\
+    -c, --clustername=ClusterName
+    -h, --hostname=HostName
+"""
 
-for host in args:
-    try:
-        conn = libvirt.open("xen+ssh://root@%s/" % host)
-    except Exception, e:
-        print "Lost Contection : " + host + " " + str(e)
-        continue
-    libshelve.modify(dbpm, host, {})
-    print 'Host %s registered. Done. ' % host
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "c:h:", ["clustername=", "hostname="])
+except:
+    usage()
+    sys.exit()
+
+clustername = ''
+hostname = ''
+for a,o in opts:
+    if a in ('--clustername', '-c'):
+        clustername = o
+    if a in ('--hostname', '-h'):
+        hostname = o
+if clustername == '' or hostname == '':
+    usage()
+    sys.exit()
+
+libHost.host_register(hostname, clustername)

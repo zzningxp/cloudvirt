@@ -1,0 +1,85 @@
+#!/usr/bin/python
+
+import sys, datetime, time, random, getopt
+import libMysqlInstance
+
+def s2hr(s):
+    ret = ''
+    if s/3600 > 0:
+        ret += str(s/3600) + 'h '
+        s %= 3600
+    if s/60 > 0:
+        ret += str(s/60) + 'm '
+        s %= 60
+    ret += str(s) + 's'
+    return ret
+
+def usage(columns):
+    print "List Virtual Machines : "
+    print "  -n, --name=NAME\tSearch for all VM name contains NAME"
+    print "  -p, --pmip=IP  \tSearch for all PM IP contains IP"
+    print "  -g, --image=IMAGEID\tSearch for all Imageid contains IMAGE"
+    print "  -t, --time=TIME\tLimit the update time with in TIME (Default %d)" % 0 ### 
+    print "  -s, --sort=COL \tSort list by COL"
+    print "  -d, --sort-desc=COL \tSort list by COL descend"
+    print "  \t\t\tSort COL: %s", ' | '.join(columns)
+
+where = []
+order = []
+
+instc = libMysqlInstance.Instances()
+#columns = instc.get_columns_list()
+#columns.remove(instc.col_instanceid)
+#print columns
+columns = [instc.col_name, instc.col_hostname, instc.col_domid, instc.col_ip, instc.col_vcpu, instc.col_mem, instc.col_mac, instc.col_status, instc.col_register_time, instc.col_start_time, instc.col_cputime, instc.col_update_time, instc.col_imagename]
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "i:n:p:t:s:d:g:h", ["name=","pmip=","time=","sort=","sort-desc","image=","help"])
+except:
+    usage(columns)
+    sys.exit()
+
+for a,o in opts:
+    if a in ('--help', '-h'):
+        usage(columns)
+        sys.exit()
+    ### need a concisely columns to show instances
+    if a in ('--name', '-n'):
+        where.append('%s like \'%s%s%s\'' % (instc.col_name, '%', o, '%'))
+    if a in ('--pmip', '-p'):
+        where.append('%s like \'%s%s%s\'' % (instc.col_hostname, '%', o, '%'))
+    if a in ('--image', '-g'):
+        where.append('%s like \'%s%s%s\'' % (instc.col_imagename, '%', o, '%'))
+    if a in ('--time', '-t'):
+        timeinternal = int(o)
+    if a in ('--sort', '-s'):
+        order.append('%s' % o)
+    if a in ('--sort-desc', '-d'):
+        order.append('%s desc' % o)
+
+where.append("%s != '%s'" %(instc.col_status, 'Dead'))
+where = ' and '.join(where)
+order = ' , '.join(order)
+
+ret0 =instc.select(' , '.join(columns), where, order)
+collen = [0 for x in range(len(columns))]
+vmcount = len(ret0)
+
+ret = []
+for instance in ret0:
+    t = list(instance)
+    t[-2] = -(datetime.datetime.now() - instance[-2]).seconds
+    ret.append(t)
+ret.insert(0, columns)
+ret[0][-2] = 'update'
+
+for ii, instance in enumerate(ret):
+    for i, val in enumerate(instance):
+        collen[i] = max(collen[i], len(str(val)))
+for instance in ret:
+    for i, val in enumerate(instance):
+        print str(val).ljust(collen[i] + 1),
+    print 
+
+print "Total %s VMs" % vmcount
+

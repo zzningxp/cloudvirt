@@ -1,49 +1,45 @@
-#!/usr/bin/env python
-import sys, os, libshelve, getopt, shutil, random, time
-import libFileCheck
+#!/usr/bin/python
+import sys, os, getopt, shutil, random, time
+import libGZip, libMysqlImages, libImage
 
 imagepath = "/var/run/cloudvirt/image/"
-idrangemin = 100000000
-idrangemax = idrangemin * 10 - 1
-dbf = "db4img.dat"
 ostypes = ['windows', 'centos', 'redhat', 'ubuntu', 'debian', 'other']
+chunkcounts = range(1, 6) 
 
 def usage():
     print """\
     -i, --image=NAME\t\tImage File Path
-    -u, --user=USER\t\tUser name
-    -t, --ostype=TYPE\t\tImage Guest OS Type
-        Guest OS Types: %s """ % ostypes
-
-def getrandid(imageostype):
-    while True:
-        imageid = "img-%s-%d" %(imageostype, random.randint(idrangemin,idrangemax))
-        if not libshelve.iskeyexists(dbf, imageid):
-            return imageid
-
-
+    -u, --user=USER\t\tUser name 
+    -c, --chunkcount=COUNT\t\tImage Compression Chunk Count (Depends on your hardware)
+	Chunksize Candidates: %s\
+""" % (chunkcounts)
+#    -t, --ostype=TYPE\t\tImage Guest OS Type
+#        Guest OS Types: %s
+ 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "i:t:u:", ["image=","ostype=","user="])
+    opts, args = getopt.getopt(sys.argv[1:], "i:t:u:c:", ["image=","ostype=","user=", "chunkcount="])
 except:
     usage()
     sys.exit()
 
 imagefilepath = ''
-imageostype = ''
 username = ''
+chunkcount = -1
 for a,o in opts:
     if a in ('--image', '-i'):
         imagefilepath = o
-    if a in ('--ostype', '-t'):
-        imageostype = o
+#    if a in ('--ostype', '-t'):
+#        imageostype = o
     if a in ('--user', '-u'):
         username = o
+    if a in ('--chunkcount', '-c'):
+	chunkcount = int(o)
 
-if imagefilepath == '' or imageostype == '' or username == '' :
+if imagefilepath == '' or username == '' or chunkcount == -1:
     usage()
     sys.exit()
 
-if imageostype not in ostypes:
+if chunkcount not in chunkcounts:
     usage()
     sys.exit()
 
@@ -61,41 +57,59 @@ if not os.path.exists(imagepath):
         print e
         sys.exit()
 
-imageid = getrandid(imageostype)
-imagename = os.path.normpath("%s/%s/" % (imagepath,imageid))
+img = libMysqlImages.Images()
+imageid = img.get_randid(os.path.basename(imagefilepath))
+imagestorepath = os.path.normpath("%s/%s/" % (imagepath,imageid))
+imagestorename = os.path.normpath("%s/%s" % (imagestorepath, os.path.basename(imagefilepath)))
+imageformat, actual_size, virtual_size = img.get_image_format(imagefilepath)
 ## need to be extend to USER management
 
 try:
-    os.mkdir(imagename)
+    os.mkdir(imagestorepath)
 except:
     sys.exit()
 
-timestamp = time.time()
-print 'File Checking Summary'
-fastchk = libFileCheck.fast_filechecker(imagefilepath, 0)
-fullchk = libFileCheck.full_filechecker(imagefilepath)
-if fastchk == 0 or fullchk == 0:
-    print 'File Sum Check Failed'
-    sys.exit()
-print 'Image Checking Summary. Done. Time: %d' % (time.time() - timestamp)
-
-print 'Image Copying'
+print 'Image Compressing and Copying'
+## disk usage check!
 try:
-    shutil.copy(imagefilepath, imagename)
-    print 'Image Copied. Done. Time: %d' % (time.time() - timestamp)
-except:
+    compress_size_dict = {}
+    timestamp = time.time()
+    os.system('gzip -1 -c %s > %s.tmp.gz' % (imagefilepath, imagestorename))
+    compress_size = os.stat('%s.tmp.gz' % imagestorename).st_size
+    chunksize = compress_size / chunkcount + 1
+    ret = os.system('split -b %d -d %s.tmp.gz %s.gz.' % (chunksize, imagestorename, imagestorename))
+    for i in range(chunkcount):
+        compress_size_dict[i] = os.stat('%s.gz.%s' % (imagestorename, str(i).zfill(libImage.zfillwidth))).st_size
+    os.system('rm -f %s.tmp.gz' % imagestorename)
+    print '***'
+    #compress_count = libGZip.file_compress(imagefilepath, imagestorename, chunksize)
+    #compress_size_dict = libGZip.file_compress_sizecount(imagestorename)
+
+    print 'Image Compreesed and Copied. Done. Original Size: %d, Compressed Size: %d, Time: %d' % (virtual_size, compress_size, time.time() - timestamp)
+except Exception, e:
+    print e
     print 'Image Copy Error'
     sys.exit()
 
-imagename = os.path.normpath(imagename + '/' + os.path.basename(imagefilepath))
-info = {}
-info['username'] = username
-info['imagefilepath'] = imagename
-info['imagesize'] = os.stat(imagename).st_size
-info['imageostype'] = imageostype
-info['registertime'] = time.localtime()
-info['fastcheck'] = fastchk
-info['fullcheck'] = fullchk
-libshelve.modify(dbf, imageid, info) 
+print 'File Checking Summary'
+timestamp = time.time()
+chksm_dict = libGZip.file_compress_checksum(imagestorename)
+print 'Image Checking Summary. Done. Time: %d' % (time.time() - timestamp)
+
+imageinfo = {}
+imageinfo[img.col_imageid] = imageid 
+imageinfo[img.col_userid] = username
+imageinfo[img.col_filepath] = imagestorename
+imageinfo[img.col_imageformat] = imageformat
+imageinfo[img.col_virtual_size] = virtual_size
+imageinfo[img.col_actual_size] = actual_size
+imageinfo[img.col_compress_size] = sum(compress_size_dict.values())
+imageinfo[img.col_chunk_count] = chunkcount
+imageinfo[img.col_chunk_size] = chunksize
+imageinfo[img.col_registertime] = time.localtime()
+#print imageinfo
+img.insert_dict(imageinfo)
+imgblock = libMysqlImages.ImageBlocks()
+imgblock.insert_blocks(imageid, compress_size_dict, chksm_dict)
 
 print '%s Registered Successfully' % imageid

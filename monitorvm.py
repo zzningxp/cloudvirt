@@ -1,14 +1,12 @@
 #!/usr/bin/env python
 import logging, time, threading
 
-import libvirt, sys, os, re, libshelve, time
+import libvirt, sys, os, re, time
+import libMysqlMacIP, libMysqlInstance, libMysqlHost
 from xml.dom import minidom
 
 workpath = '/root/cloudvirt/'
 state = ['NoState','Running','Blocked','Paused ','Shutdwn','Shutoff','Crashed']
-ipdb = workpath + 'db4ip.dat'
-vmdb = workpath + 'db4vm.dat'
-pmdb = workpath + 'db4pm.dat'
 
 def sformat(t):
     t = re.split("\:", t)
@@ -36,19 +34,18 @@ def getcreatetime(pid, domname):
             return tformat(iut[1])
     return 0
 
-def getdomains(pid, macip, logger):
+def getdomains(pid, logger):
     try:
         conn = libvirt.open("xen+ssh://root@%s/" % pid)
     except Exception, e:
         logger.info("Lost Contection : " + pid + " " + str(e))
         return
-
-    db = libshelve.load(vmdb)
-    dbkey = db.keys()
-
+    
+    macip = libMysqlMacIP.MacIPs()
+    
     for id in conn.listDomainsID():
         if id > 0:
-            dominfo = {}
+            vminfo = {}
             dom = conn.lookupByID(id)
             try:
                 x = dom.XMLDesc(0)
@@ -57,49 +54,56 @@ def getdomains(pid, macip, logger):
             except Exception, e:
                 logger.info("Error Domain Infomation from XML Identifier: " +pid + dom.name() + str(e))
             else:
-                dbname = str(dom.name())
-                dominfo['create_time'] = None
-                dominfo['register_time'] = None
-                dominfo['image_id'] = None
-                if dbname in dbkey:
-                    dbv = db[dbname]
-                    if dbv['create_time'] == None:
-                        ct = getcreatetime(pid, dom.name())
-                        if ct > 0:
-                            dominfo['create_time'] = time.localtime(time.time() - ct)
-                    else:
-                        dominfo['create_time'] = dbv['create_time']
+                vminfo['name'] = dom.name()
+                vminfo['hostname'] = pid
+                vminfo['mac'] = str(mac)
+                vminfo['ip'] = macip.getip(str(mac))
+                vminfo['status'] = state[dom.info()[0]]
+                vminfo['update_time'] = time.localtime()
+                vminfo['register_time'] = time.localtime()
+                vminfo['start_time'] = time.localtime(time.time() - getcreatetime(pid, dom.name()))
+                vminfo['cputime'] = dom.info()[4] / 100000000
+                vminfo['vcpu'] = dom.info()[3]
+                vminfo['mem'] = dom.info()[2] / 1024
+                vminfo['domid'] = dom.ID()
 
-                    try:
-                        dominfo['register_time'] = dbv['register_time']
-                    except:
-                        pass
-                    try:
-                        dominfo['image_id'] = dbv['image_id']
-                    except:
-                        pass
-
-                ip = macip.get(mac)
-                dominfo['pm'] = pid
-                dominfo['id_on_pm'] = dom.ID()
-                dominfo['name'] = dom.name()
-                dominfo['ip'] = ip
-                dominfo['mac'] = mac
-                dominfo['mem'] = dom.info()[2] / 1024
-                dominfo['vcpu'] = dom.info()[3]
-                dominfo['cputime'] = dom.info()[4] / 1000000000
-                dominfo['status'] = state[dom.info()[0]]
-                dominfo['update_time'] = time.localtime()
-                libshelve.modify(vmdb, dbname, dominfo)
-            
+                instc = libMysqlInstance.Instances()
+                name = str(vminfo[instc.col_name])
+                wheres = [(instc.col_name, name)]
+                inslist = instc.select_dict_withtuples(wheres)
+                if len(inslist) > 0:
+                    dbinfo = inslist[0]
+                    s = []
+                    s.append((instc.col_update_time, vminfo[instc.col_update_time]))
+                    s.append((instc.col_cputime, vminfo[instc.col_cputime]))
+                    if dbinfo[instc.col_ip] != vminfo[instc.col_ip]:
+                        s.append((instc.col_ip, vminfo[instc.col_ip]))
+                    if dbinfo[instc.col_status] != vminfo[instc.col_status]:
+                        s.append((instc.col_status, vminfo[instc.col_status]))
+                    if dbinfo[instc.col_domid] != vminfo[instc.col_domid]:
+                        s.append((instc.col_domid, vminfo[instc.col_domid]))
+                    if dbinfo[instc.col_start_time] != vminfo[instc.col_start_time]:
+                        s.append((instc.col_start_time, vminfo[instc.col_start_time]))
+                    instc.update_tuples(wheres, s)
+                else:
+                    instc.insert_dict(vminfo)
 
 def getinstances(logger):
-    plist = libshelve.getkeys(pmdb)
-    macip = libshelve.load(ipdb)
+    hst = libMysqlHost.Hosts()
+    
+    columns = [hst.col_hostid, hst.col_clustername]
+    ret = hst.select(' , '.join(columns), '', '')
+    
+    plist = []
+    for i in ret:
+    	plist.append(i[0])
 
     thr = []
     for pid in plist:
-        thr.append(threading.Thread(target=getdomains, args=(pid, macip, logger)))
+        thr.append(threading.Thread(target=getdomains, args=(pid, logger)))
     for i in range(len(thr)):
         thr[i].start()
+
+    instc = libMysqlInstance.Instances()
+    instc.mark_dead()
 

@@ -1,0 +1,10 @@
+#!/usr/bin/python
+
+import xmlrpclib, sys
+
+host = sys.argv[1]
+port = sys.argv[2]
+print "http://%s:%s" % (host, port)
+server = xmlrpclib.ServerProxy("http://%s:%s" % (host, port))
+words = server.sayHello()
+print "result:" + words

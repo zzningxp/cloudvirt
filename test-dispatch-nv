@@ -1,0 +1,7 @@
+#!/usr/bin/python
+
+import libImage, sys, re
+
+nodes, num, list = libImage.read_nodes('n0')
+print nodes
+libImage.dispatch_nv(nodes, '192.168.2.1', sys.argv[1])
