@@ -29,8 +29,9 @@ def usage(db, timeinternal, sortarg):
     print "List Virtual Machines in Nodes configured in File : [ nodelist ]"
     print "  -n, --name=NAME\tSearch for all VM name contains NAME"
     print "  -p, --pmip=IP  \tSearch for all PM IP contains IP"
+    print "  -g, --image=IMAGEID\tSearch for all Imageid contains IMAGE"
     print "  -t, --time=TIME\tLimit the update time with in TIME (Default %d)" % timeinternal
-    print "  -s, --sort=COL \tSort list by COL (Default %s)" % sortarg
+    print " {{ -s, --sort=COL \tSort list by COL (Default %s)" % sortarg
     db = db[db.keys()[0]]
     print "  \t\t\tSort COL: ",
     for key in db.keys():
@@ -40,11 +41,12 @@ searchname = ''
 searchpmip = ''
 timeinternal = 200
 sortarg = 'pm'
+imageid = ''
 
 idb = libshelve.load(db4vm)
 
 try:
-    opts, args = getopt.getopt(sys.argv[1:], "i:n:p:t:s:h", ["name=","pmip=","time=","sort=","help"])
+    opts, args = getopt.getopt(sys.argv[1:], "i:n:p:t:s:g:h", ["name=","pmip=","time=","sort=","image=", "help"])
 except:
     usage(idb, timeinternal, sortarg)
     sys.exit()
@@ -57,6 +59,8 @@ for a,o in opts:
         searchname = o
     if a in ('--pmip', '-p'):
         searchpmip = o
+    if a in ('--image', '-g'):
+        imageid = o
     if a in ('--time', '-t'):
         timeinternal = int(o)
     if a in ('--sort', '-s'):
@@ -75,10 +79,11 @@ for key in pms:
     createtime = None
     if not dom['create_time'] == None:
         createtime = time.strftime("%y-%m-%d %H:%M", dom['create_time'])
-
-    if updatetime < timeinternal and searchname in dom['name'] and searchpmip in dom['pm']:
+    if dom['image_id'] == None :
+        dom['image_id'] = 'None'
+    if updatetime < timeinternal and searchname in dom['name'] and searchpmip in dom['pm'] and imageid in dom['image_id']:
         pmcnt += 1
-        print '%s :%s\t' % (dom['pm'], dom['id_on_pm']),
+        print '%s  :%s\t' % (dom['pm'], dom['id_on_pm']),
         print '%s\t%s\t%s\t%d %dM\t%ss\t' % (dom['name'], dom['ip'], dom['mac'], dom['vcpu'], dom['mem'], dom['cputime']),
         print '%s\t%s\t%s\t^%ss ago' % (dom['status'], dom['image_id'], createtime, updatetime)
 

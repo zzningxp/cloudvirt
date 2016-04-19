@@ -7,7 +7,8 @@ from xml.dom import minidom
 workpath = '/root/cloudvirt/'
 ipdb = 'db4ip.dat'
 dbpm = 'db4pm.dat'
-ipranges = ['192.168.2']
+ipranges = ['172.16.30', '172.16.31']
+## should get ipranges from outside of the source code
 ips = []
 
 """

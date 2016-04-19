@@ -1,6 +1,21 @@
 #!/usr/bin/env python
 
-import sys, libshelve, time
+import sys, libSqlite, time, libSqliteImages
+db = libSqlite.datebase()
+db.create_table('test', ['a', 'b', 'c'], ['INTEGER', 'TEXT', 'TEXT'])
+db.insert_withcolumns('test', ['c', 'a', 'b'], [1,'xx','yy'])
 
-db = sys.argv[1]
-print libshelve.load(db)
+x = db.select_all('test')
+
+for row in x:
+    print row
+
+dbimages = libSqliteImages.Images()
+dbimages.create_table()
+dbimages.insert(['xxx-1', 'x', '/', 100, 'test', 2319872, ''])
+dbimages.insert_withcolumns([dbimages.col_imageid], ['xxx-2'])
+
+x = dbimages.select_all()
+print x
+for r in x:
+    print r

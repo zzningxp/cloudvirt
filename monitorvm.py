@@ -6,9 +6,9 @@ from xml.dom import minidom
 
 workpath = '/root/cloudvirt/'
 state = ['NoState','Running','Blocked','Paused ','Shutdwn','Shutoff','Crashed']
-ipdb = 'db4ip.dat'
-vmdb = 'db4vm.dat'
-pmdb = 'db4pm.dat'
+ipdb = workpath + 'db4ip.dat'
+vmdb = workpath + 'db4vm.dat'
+pmdb = workpath + 'db4pm.dat'
 
 def sformat(t):
     t = re.split("\:", t)
@@ -57,7 +57,7 @@ def getdomains(pid, macip, logger):
             except Exception, e:
                 logger.info("Error Domain Infomation from XML Identifier: " +pid + dom.name() + str(e))
             else:
-                dbname = pid + '--' + str(dom.name())
+                dbname = str(dom.name())
                 dominfo['create_time'] = None
                 dominfo['register_time'] = None
                 dominfo['image_id'] = None
@@ -94,8 +94,8 @@ def getdomains(pid, macip, logger):
             
 
 def getinstances(logger):
-    plist = libshelve.getkeys(workpath + pmdb)
-    macip = libshelve.load(workpath + ipdb)
+    plist = libshelve.getkeys(pmdb)
+    macip = libshelve.load(ipdb)
 
     thr = []
     for pid in plist:

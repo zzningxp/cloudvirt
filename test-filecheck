@@ -2,9 +2,15 @@
 
 import libFileCheck, sys, time
 s = time.time()
-print libFileCheck.fast_filechecker(sys.argv[1])
+print libFileCheck.fast_filechecker(sys.argv[1], 0)
 e = time.time()
 print e - s
+
+s = time.time()
+print libFileCheck.fast_filechecker(sys.argv[1], 1)
+e = time.time()
+print e - s
+
 
 s = time.time()
 print libFileCheck.full_filechecker(sys.argv[1])

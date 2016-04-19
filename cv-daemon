@@ -6,15 +6,15 @@ import time
 import monitorvm, monitorip
 
 workpath = '/root/cloudvirt/'
-timeinterval = 15
-xtime = 2
+timeinterval = 30
+xtime = 10
 
 def main(logger):   
     c = 0
     while 1:
-        #getins = threading.Thread(target=monitorvm.getinstances, args=(logger,))
-        #getins.start()
-        monitorvm.getinstances(logger)
+        getins = threading.Thread(target=monitorvm.getinstances, args=(logger,))
+        getins.start()
+        #monitorvm.getinstances(logger)
         if c == 0:
             upip = threading.Thread(target=monitorip.updateipdb, args=(logger,))
             upip.start()

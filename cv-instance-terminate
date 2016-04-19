@@ -1,0 +1,95 @@
+#!/usr/bin/env python
+
+import libvirt, libshelve, threading, getopt, os, sys, random, re
+
+installpath = '/root/cloudvirt/'
+workpath = '/var/run/cloudvirt/vm/'
+db4vm = installpath + 'db4vm.dat'
+
+def getallnodes():
+    db = libshelve.load(db4vm)
+    pms = []
+    for key in db.keys():
+        pms.append(db[key]['pm'])
+    return list(set(pms))
+
+def terminate_instance_byid(id):
+    db = libshelve.load(db4vm)
+    pid = None
+    for key in db.keys():
+        if db[key]['name'] == id:
+            pid = db[key]['pm']
+            break
+    if pid:
+        conn = libvirt.open("xen+ssh://root@%s/" % pid)
+        if conn == None:
+            print 'Failed to open connection to the hypervisor'
+            return
+        try:
+            dom = conn.lookupByName(id)
+            dom.destroy()
+            print "%s has been terminated, please wait it to shutdown" % id
+        except:
+            print "%s has NOT terminated, or it's not existed"
+    
+def terminate_instancs_byPM(pid):
+    conn = libvirt.open("xen+ssh://root@%s/" % pid)
+    if conn == None:
+        print 'Failed to open connection to the hypervisor'
+        return
+    
+    for id in conn.listDomainsID():
+        if id > 0:
+	    dom = conn.lookupByID(id)
+	    name = dom.name()
+	    dom.destroy()
+	    print "%s has been terminated, please wait it to shutdown" % name
+
+def terminateAllInstances(nodes):
+    print "Terminate all VMs on " + str(nodes) + ". \nAre you sure ?",
+    v = raw_input()
+    if v != 'y' :
+        sys.exit(1)
+
+    thr = []
+    for n in nodes:
+        thr.append(threading.Thread(target=terminatePMInstancs, args=(n,)))
+
+    for i in range(len(nodes)):
+        thr[i].start()
+    for i in range(len(nodes)):
+        thr[i].join()
+
+def usage():
+    print """\
+\t--all\t\t\tTerminated ALL the VMs, be careful
+\t-i=Instance Name\tTerminated Instances by VM name, like cvi-xxxx-xxxx
+\t-p=PM\t\t\tTerminated all the VM on this PM\
+"""
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "i:p:", ["all", "clean"])
+except:
+    usage()
+    sys.exit()
+
+clean = False
+for a, o in opts:
+    if a in ('--clean'):
+        clean = True
+## to clean the image file etc..
+## I need a independ module to clean files, here can call that module
+
+for a, o in opts:
+    if a in ('--all'):
+        nodes = getallnodes()
+        terminateAllInstances(nodes)
+        sys.exit()
+    if a in ('-i'):
+        terminate_instance_byid(o)
+        sys.exit()
+    if a in ('-p'):
+        terminate_instancs_byPM(o)
+        sys.exit()
+
+usage()

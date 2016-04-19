@@ -1,0 +1,101 @@
+#!/usr/bin/env python
+import sys, os, libshelve, getopt, shutil, random, time
+import libFileCheck
+
+imagepath = "/var/run/cloudvirt/image/"
+idrangemin = 100000000
+idrangemax = idrangemin * 10 - 1
+dbf = "db4img.dat"
+ostypes = ['windows', 'centos', 'redhat', 'ubuntu', 'debian', 'other']
+
+def usage():
+    print """\
+    -i, --image=NAME\t\tImage File Path
+    -u, --user=USER\t\tUser name
+    -t, --ostype=TYPE\t\tImage Guest OS Type
+        Guest OS Types: %s """ % ostypes
+
+def getrandid(imageostype):
+    while True:
+        imageid = "img-%s-%d" %(imageostype, random.randint(idrangemin,idrangemax))
+        if not libshelve.iskeyexists(dbf, imageid):
+            return imageid
+
+
+try:
+    opts, args = getopt.getopt(sys.argv[1:], "i:t:u:", ["image=","ostype=","user="])
+except:
+    usage()
+    sys.exit()
+
+imagefilepath = ''
+imageostype = ''
+username = ''
+for a,o in opts:
+    if a in ('--image', '-i'):
+        imagefilepath = o
+    if a in ('--ostype', '-t'):
+        imageostype = o
+    if a in ('--user', '-u'):
+        username = o
+
+if imagefilepath == '' or imageostype == '' or username == '' :
+    usage()
+    sys.exit()
+
+if imageostype not in ostypes:
+    usage()
+    sys.exit()
+
+if not os.path.exists(imagefilepath):
+    print '%s is not existed' % imagefilepath
+    sys.exit()
+if not os.path.isfile(imagefilepath):
+    print '%s is not a file' % imagefilepath
+    sys.exit()
+
+if not os.path.exists(imagepath):
+    try:
+        os.makedirs(imagepath)
+    except Exception, e:
+        print e
+        sys.exit()
+
+imageid = getrandid(imageostype)
+imagename = os.path.normpath("%s/%s/" % (imagepath,imageid))
+## need to be extend to USER management
+
+try:
+    os.mkdir(imagename)
+except:
+    sys.exit()
+
+timestamp = time.time()
+print 'File Checking Summary'
+fastchk = libFileCheck.fast_filechecker(imagefilepath, 0)
+fullchk = libFileCheck.full_filechecker(imagefilepath)
+if fastchk == 0 or fullchk == 0:
+    print 'File Sum Check Failed'
+    sys.exit()
+print 'Image Checking Summary. Done. Time: %d' % (time.time() - timestamp)
+
+print 'Image Copying'
+try:
+    shutil.copy(imagefilepath, imagename)
+    print 'Image Copied. Done. Time: %d' % (time.time() - timestamp)
+except:
+    print 'Image Copy Error'
+    sys.exit()
+
+imagename = os.path.normpath(imagename + '/' + os.path.basename(imagefilepath))
+info = {}
+info['username'] = username
+info['imagefilepath'] = imagename
+info['imagesize'] = os.stat(imagename).st_size
+info['imageostype'] = imageostype
+info['registertime'] = time.localtime()
+info['fastcheck'] = fastchk
+info['fullcheck'] = fullchk
+libshelve.modify(dbf, imageid, info) 
+
+print '%s Registered Successfully' % imageid

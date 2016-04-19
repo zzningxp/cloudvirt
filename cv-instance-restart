@@ -1,0 +1,15 @@
+#!/usr/bin/env python
+
+import libInstance, libshelve, os, sys, random, re, libThreading
+
+installpath = '/root/cloudvirt/'
+dbvm = installpath + 'db4vm.dat'
+
+args = sys.argv[1:]
+vms = libshelve.load(dbvm)
+for cvi in args:
+    vm = libshelve.getkey(dbvm, cvi)
+    if vm == None:
+        print '%s is not a register instance' % cvi
+        continue
+    libInstance.restart_instance(vm['pm'], cvi)

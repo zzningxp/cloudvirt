@@ -27,7 +27,6 @@ def generate_instances_info(nodes, nums, imageid, vcpus, mem):
             domU_rand_mac = 'd0:0d:%02x:%02x:%02x:%02x' % (random.randint(0,255), random.randint(0,255), random.randint(0,255), random.randint(0,255))
             domU_rand_mac = domU_rand_mac.upper()
 
-            dbkey = '%s--%s' % (pid, instancename)
             dominfo = {}
             dominfo['pm'] = pid
             dominfo['id_on_pm'] = None
@@ -42,7 +41,7 @@ def generate_instances_info(nodes, nums, imageid, vcpus, mem):
             dominfo['create_time'] = None
             dominfo['register_time'] = time.localtime()
             dominfo['image_id'] = imageid
-            libshelve.modify('db4vm.dat', dbkey, dominfo)
+            libshelve.modify('db4vm.dat', instancename, dominfo)
 
         dom_list.append(list)
 
@@ -55,11 +54,11 @@ def create_instance_threading(pid, dom_list):
 	return 0;
 
     for dom in dom_list:
-        dbkey = '%s--%s' %(pid, dom)
-        dominfo = libshelve.getkey(db4vm, dbkey)
+        dominfo = libshelve.getkey(db4vm, dom)
         if dominfo == None:
-            ##print sth.
-            return
+            print 'Domain info can\'t be loaded from datebase'
+            return 255
+
         name = dominfo['name']
         mem = dominfo['mem'] * 1000
         vcpu = dominfo['vcpu']
@@ -91,3 +90,34 @@ def create_instance(nodes, instance_name):
     ts.set_func_list(thr)
     ts.start()
 
+def restart_instance(pid, name):
+    conn = libvirt.open("xen+ssh://root@%s/" % pid)
+    if conn == None:
+        print 'Failed to open connection to the hypervisor'
+        return;
+
+    try:
+        conn.lookupByName(name)
+        print 'Instance %s on host %s is running' % (name, pid)
+        return
+    except:
+        pass
+
+    isxml = os.system('ssh %s ls -l %s/%s/libvirt.xml 1>/dev/null 2>/dev/null' % (pid, workpath, name))
+    isimg = os.system('ssh %s ls -l %s/%s/root 1>/dev/null 2>/dev/null' % (pid, workpath, name))
+    ##check sum this image file!
+    tmpfname = "/tmp/tmplibvirt%s.xml" % name
+    isscp = os.system("scp %s:%s/%s/libvirt.xml %s 1>/dev/null 2>/dev/null" % (pid, workpath, name, tmpfname))
+    if isxml == 0 and isscp == 0:
+        xml = open(tmpfname, "r").read()
+
+        if isimg == 0:
+            try:
+                dom = conn.createXML(xml, 0)
+                print "Domain %s restart on %s" % (name, pid)
+            except Exception, e:
+                print "Domain %s on %s have not been restart. %s" % (name, pid, e )
+        else:
+            print 'Instance Image File Missing or Modified'
+    else:
+        print 'Instance Config File Missing or Modified'

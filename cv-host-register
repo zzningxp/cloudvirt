@@ -12,3 +12,4 @@ for host in args:
         print "Lost Contection : " + host + " " + str(e)
         continue
     libshelve.modify(dbpm, host, {})
+    print 'Host %s registered. Done. ' % host

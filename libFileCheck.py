@@ -1,10 +1,11 @@
 #!/usr/bin/env python
 
 import md5
+blocksize = 1024 * 1024
+checksize = blocksize * 63
 
 def full_filechecker(filepath):
     try: 
-        blocksize = 1024 * 64 
         f = open(filepath, "rb") 
         str = f.read(blocksize) 
         m = md5.new()
@@ -17,12 +18,10 @@ def full_filechecker(filepath):
         return 0 
     return m.hexdigest()
 
-def fast_filechecker(filepath):
+def fast_filechecker(filepath, offset):
     try: 
-        blocksize = 1024 * 1024
-        checksize = blocksize * 63
-
         f = open(filepath, "rb")
+        f.seek(blocksize * offset, 1)
         str = f.read(blocksize) 
         m = md5.new()
         while(len(str) != 0):
